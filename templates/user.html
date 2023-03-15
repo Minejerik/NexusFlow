@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{user['name']}}</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+	<style>
+		html{
+			font-family: 'Roboto', sans-serif;
+		}
+		#user{
+	float:right;
+	background-color: #292929;
+	color: white;;
+	border-radius:15px;
+	padding:15px;
+	text-align: center;
+		}
+
+		img{
+			border-radius:15px;
+		}
+
+		p{
+			background-color:#696969;
+			color:white;
+			border-radius:7px;
+		}
+
+		.badges{
+			background-color:#696969;
+			color:white;
+			border-radius:7px;
+		}
+
+		
+	</style>
+</head>
+
+<body>
+	<div id="user">
+		<img alt="user url" src={{user['pfpurl']}} width="256px" height="256px"></img>
+		<h3>{{user['name']}}</h3>
+		<p>{{user['bio']}}</p>
+		{% if badges|length > 1 %}
+		<div class="badges">
+		{% for badge in badges%}
+			{% if badges|length > 1 %}
+				<br>
+			{% endif %}
+			<div>{{badgelist[badge]}}</div>
+		{% endfor %}
+			<br>
+		</div>
+		{% endif %}
+	</div>
+</body>
+
+</html>

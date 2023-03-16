@@ -14,14 +14,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
 db = SQLAlchemy(app)
 
+
 class Serializer(object):
 
-    def serialize(self):
-        return {c: getattr(self, c) for c in inspect(self).attrs.keys()}
+	def serialize(self):
+		return {c: getattr(self, c) for c in inspect(self).attrs.keys()}
 
-    @staticmethod
-    def serialize_list(l):
-        return [m.serialize() for m in l]
+	@staticmethod
+	def serialize_list(l):
+		return [m.serialize() for m in l]
+
 
 class Users(db.Model, Serializer):
 	id = db.Column(db.Integer, primary_key=True)
@@ -32,7 +34,7 @@ class Users(db.Model, Serializer):
 	password = db.Column(db.String(50))
 	pfpurl = db.Column(db.String(150))
 	admin = db.Column(db.Boolean)
-	
+
 	def serialize(self):
 		d = Serializer.serialize(self)
 		del d['password']
@@ -40,7 +42,7 @@ class Users(db.Model, Serializer):
 
 
 class Posts(db.Model):
-	id = db.Column(db.Integer, primary_key=True)
+	id = db.Column(db.String, primary_key=True)
 	title = db.Column(db.String(250))
 	content = db.Column(db.String(2000))
 	parentpost = db.Column(db.Integer)
@@ -99,9 +101,6 @@ def token_required(f):
 	return decorator
 
 
-
-
-
 @app.route('/')
 def maintemp():
 	return redirect("/register")
@@ -115,17 +114,17 @@ def login():
 		auth = request.form
 		user = Users.query.filter_by(name=auth['name']).first()
 		if not user:
-			return jsonify({"correct":False})
+			return jsonify({"correct": False})
 		if check_password_hash(user.password, auth['password']):
 			token = jwt.encode(
 			 {
 			  'public_id': user.public_id,
 			  'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=240)
 			 }, app.config['SECRET_KEY'], 'HS256')
-			ret = make_response(jsonify({"correct":True,"token":token}))
+			ret = make_response(jsonify({"correct": True, "token": token}))
 			ret.set_cookie('token', token)
 			return ret
-		return jsonify({"correct":False})
+		return jsonify({"correct": False})
 	else:
 		return render_template('login.html', error=error, log="login")
 
@@ -143,10 +142,12 @@ badgelist = {
  '4': "Beta-Tester"
 }
 
+
 @app.route('/api/getsettings')
 @token_required
 def getsettings(current_user):
 	return jsonify(current_user.password)
+
 
 @app.route('/settings')
 def settings():
@@ -156,7 +157,7 @@ def settings():
 	data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
 	current_user = Users.query.filter_by(public_id=data['public_id']).first()
 	return render_template('settings.html')
-	
+
 
 @app.route('/u/<string:user>')
 def showuser(user):
@@ -167,6 +168,17 @@ def showuser(user):
 	                       user=userlist,
 	                       badges=[*str(userlist.badges)],
 	                       badgelist=badgelist)
+
+
+@app.route('/post/create')
+def createpost():
+	token = request.cookies.get('token')
+	if not token:
+		return redirect("/u/minejerik")
+	data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+	current_user = Users.query.filter_by(public_id=data['public_id']).first()
+	return render_template('post_create.html')
+
 
 if __name__ == '__main__':
 	app.run(host='0.0.0.0', port=81, debug=True)

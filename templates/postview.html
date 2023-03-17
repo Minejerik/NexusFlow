@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{post['title']}}</title>
+	<style>
+		html{
+			color:white;
+		}
+		
+		#post{
+			background-color:#292929;
+			border-radius:15px;
+			height: 150px;
+		}
+
+		#usercard{
+			background-color:#696969;
+			border-radius:15px;
+			width: 200px;
+		}
+
+		img{
+			padding-top:15px;
+			padding-left:15px;
+		}
+
+		#content{
+			background-color:#696969;
+			border-radius:15px;
+			width: 200px;
+		}
+		
+	</style>
+</head>
+<body>
+	<div id="post">
+		<div id="usercard"><img src={{create['pfpurl']}} width="48px" height="48px"> <span style="font-size:32px">{{create['name']}}</span></div>
+		<div id="content">
+		{{post['content']}}
+		</div>
+	</div>
+</body>
+</html>

@@ -1,19 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-	<meta charset="UTF-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>NexusFlow post</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusFlow post</title>
 </head>
+
 <body>
-	<script>
-		function post() {
-			document.write(document.cookie)
-		}
-	</script>
-	<input type="text" id="postname" placeholder="Post Title"><br>
-	<textarea rows = "5" cols = "60" name = "description" id="postcontent" placeholder="Post Content"></textarea><br>
-	<button onclick="post()">Post</button>
+    <script>
+        async function post() {
+            const head = document.getElementById('postname').value
+            const cont = document.getElementById('postcontent').value
+
+            let j = {}
+
+            const resp = await fetch('/api/getid', {
+                method: "GET"
+            })
+            const temp = await resp.text()
+            const test = JSON.parse(temp)
+            j.title = head
+            j.content = cont
+            j.creator = test.userid
+            j.parentpost = null
+            j.subpost = null
+
+            let jsonstring = JSON.stringify(j)
+            const resp2 = await fetch('/api/createpost', {
+                body: jsonstring,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                method: "POST"
+            })
+            const resptxt = await resp2.text()
+						const tempa = JSON.parse(resptxt)
+            window.location.href = "/p/"+tempa.id
+        }
+    </script>
+    <input type="text" id="postname" placeholder="Post Title"><br>
+    <textarea rows="5" cols="60" name="description" id="postcontent" placeholder="Post Content"></textarea><br>
+    <button onclick="post()">Post</button>
 </body>
+
 </html>

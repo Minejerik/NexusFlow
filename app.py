@@ -1,4 +1,6 @@
 from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for
+import sys
+from json import loads
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
@@ -14,6 +16,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 
 db = SQLAlchemy(app)
 
+
+@app.context_processor
+def inject_now():
+    return {'now': datetime.datetime.utcnow()}
 
 class Serializer(object):
 
@@ -42,7 +48,8 @@ class Users(db.Model, Serializer):
 
 
 class Posts(db.Model):
-	id = db.Column(db.String, primary_key=True)
+	id = db.Column(db.Integer,primary_key=True,autoincrement=True)
+	pub_id = db.Column(db.String(75))
 	title = db.Column(db.String(250))
 	content = db.Column(db.String(2000))
 	parentpost = db.Column(db.Integer)
@@ -57,7 +64,7 @@ with app.app_context():
 @app.route('/register', methods=['POST', 'GET'])
 def signup_user():
 	if request.method == 'GET':
-		return render_template('login.html', log="register")
+		return render_template('newlogin.html', log="register")
 	else:
 		data = request.form
 		userlist = Users.query.filter_by(name=data['name']).first()
@@ -83,15 +90,14 @@ def token_required(f):
 
 	@wraps(f)
 	def decorator(*args, **kwargs):
-		token = None
-		if 'x-access-tokens' in request.headers:
-			token = request.headers['x-access-tokens']
+		token = request.cookies.get('token')
+		if not token:
+			return jsonify({'message': 'a valid token is missing'})
 
 		if not token:
 			return jsonify({'message': 'a valid token is missing'})
 		try:
 			data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-			print(data)
 			current_user = Users.query.filter_by(public_id=data['public_id']).first()
 		except Exception as e:
 			return jsonify({'message': 'token is invalid', 'error': str(e)})
@@ -101,9 +107,37 @@ def token_required(f):
 	return decorator
 
 
+@app.route('/api/createpost', methods=['POST'])
+@token_required
+def createpost(user):
+	test = request.get_json()
+	try:
+		new_post = Posts(pub_id=str(uuid.uuid4()),
+		                 title=test['title'],
+		                 content=test['content'],
+		                 creator=test['creator'],
+		                 parentpost=test['parentpost'],
+		                 subpost=test['subpost'])
+		db.session.add(new_post)
+		db.session.commit()
+	except Exception as e:
+		return jsonify({'error': str(e)})
+	return jsonify({"error": False,"id":new_post.pub_id})
+
+@app.route('/p/<string:post_id>')
+def getpost(post_id):
+	try:
+		post = Posts.query.filter_by(pub_id=post_id).first()
+		create = Users.query.filter_by(public_id=post.creator).first()
+		post = post.__dict__
+		create = create.__dict__
+		return render_template('postview.html',post=post,create=create)
+	except Exception as e:
+		return "Unknown Post<br>"+str(e)
+
 @app.route('/')
 def maintemp():
-	return redirect("/register")
+	return redirect('/login')
 
 
 # Route for handling the login page logic
@@ -126,12 +160,12 @@ def login():
 			return ret
 		return jsonify({"correct": False})
 	else:
-		return render_template('login.html', error=error, log="login")
+		return render_template('newlogin.html', error=error, log="login")
 
 
 @app.route("/home")
 def home():
-	return redirect('/u/minejerik')
+	return redirect('')
 
 
 badgelist = {
@@ -170,13 +204,29 @@ def showuser(user):
 	                       badgelist=badgelist)
 
 
-@app.route('/post/create')
-def createpost():
+@app.route('/api/getid')
+def getid():
 	token = request.cookies.get('token')
 	if not token:
-		return redirect("/u/minejerik")
-	data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-	current_user = Users.query.filter_by(public_id=data['public_id']).first()
+		return jsonify({"userid": False})
+	try:
+		data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+		current_user = Users.query.filter_by(public_id=data['public_id']).first()
+		id = current_user.public_id
+	except Exception as e:
+		return jsonify({"userid": False, 'error': str(e)})
+	return jsonify({"userid": id})
+
+
+@app.route('/post/create')
+def postcreate():
+	token = request.cookies.get('token')
+	if not token:
+		return redirect("/login")
+	try:
+		jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+	except:
+		return redirect('/login')
 	return render_template('post_create.html')
 
 

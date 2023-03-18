@@ -157,11 +157,20 @@ def login():
 			 }, app.config['SECRET_KEY'], 'HS256')
 			ret = make_response(jsonify({"correct": True, "token": token}))
 			ret.set_cookie('token', token)
+			print('YIPPE')
 			return ret
+		print('bad')
 		return jsonify({"correct": False})
 	else:
 		return render_template('newlogin.html', error=error, log="login")
 
+@app.route('/admin')
+@token_required
+def admin(user):
+	if not user: #or user.admin == False:
+		return "Not Found",404
+	else:
+		return render_template('admin.html',user=user.__dict__)
 
 @app.route("/home")
 def home():

@@ -11,7 +11,6 @@
 <body>
     <script>
         async function post() {
-            const head = document.getElementById('postname').value
             const cont = document.getElementById('postcontent').value
 
             let j = {}
@@ -21,7 +20,6 @@
             })
             const temp = await resp.text()
             const test = JSON.parse(temp)
-            j.title = head
             j.content = cont
             j.creator = test.userid
             j.parentpost = null
@@ -40,7 +38,6 @@
             window.location.href = "/p/"+tempa.id
         }
     </script>
-    <input type="text" id="postname" placeholder="Post Title"><br>
     <textarea rows="5" cols="60" name="description" id="postcontent" placeholder="Post Content"></textarea><br>
     <button onclick="post()">Post</button>
 </body>

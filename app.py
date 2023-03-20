@@ -5,21 +5,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 import uuid
+from flaskext.markdown import Markdown
 from sqlalchemy.inspection import inspect
 import jwt
-import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-
+md = Markdown(app,extensions=['footnotes'],)
 db = SQLAlchemy(app)
 
 
 @app.context_processor
 def inject_now():
-    return {'now': datetime.datetime.utcnow()}
+    return {'now': datetime.utcnow()}
 
 class Serializer(object):
 
@@ -50,11 +51,13 @@ class Users(db.Model, Serializer):
 class Posts(db.Model):
 	id = db.Column(db.Integer,primary_key=True,autoincrement=True)
 	pub_id = db.Column(db.String(75))
-	title = db.Column(db.String(250))
+	date_created = db.Column(db.DateTime, default=datetime.utcnow)
 	content = db.Column(db.String(2000))
 	parentpost = db.Column(db.Integer)
 	creator = db.Column(db.String(50))
 	subpost = db.Column(db.Integer)
+	likes = db.Column(db.Integer)
+	comments = db.Column(db.Integer)
 
 
 with app.app_context():
@@ -93,9 +96,6 @@ def token_required(f):
 		token = request.cookies.get('token')
 		if not token:
 			return jsonify({'message': 'a valid token is missing'})
-
-		if not token:
-			return jsonify({'message': 'a valid token is missing'})
 		try:
 			data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
 			current_user = Users.query.filter_by(public_id=data['public_id']).first()
@@ -113,11 +113,12 @@ def createpost(user):
 	test = request.get_json()
 	try:
 		new_post = Posts(pub_id=str(uuid.uuid4()),
-		                 title=test['title'],
 		                 content=test['content'],
 		                 creator=test['creator'],
 		                 parentpost=test['parentpost'],
-		                 subpost=test['subpost'])
+		                 subpost=test['subpost'],
+										likes = 0,
+										comments = 0)
 		db.session.add(new_post)
 		db.session.commit()
 	except Exception as e:
@@ -131,7 +132,8 @@ def getpost(post_id):
 		create = Users.query.filter_by(public_id=post.creator).first()
 		post = post.__dict__
 		create = create.__dict__
-		return render_template('postview.html',post=post,create=create)
+		time = post['date_created'].strftime("%Y-%m-%d %H:%M:%S")#[:str(post['date_created']).find('.')]
+		return render_template('postview.html',post=post,create=create,time=time)
 	except Exception as e:
 		return "Unknown Post<br>"+str(e)
 
@@ -153,7 +155,7 @@ def login():
 			token = jwt.encode(
 			 {
 			  'public_id': user.public_id,
-			  'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=240)
+			  'exp': datetime.utcnow() + timedelta(minutes=240)
 			 }, app.config['SECRET_KEY'], 'HS256')
 			ret = make_response(jsonify({"correct": True, "token": token}))
 			ret.set_cookie('token', token)
@@ -228,7 +230,8 @@ def getid():
 
 
 @app.route('/post/create')
-def postcreate():
+@token_required
+def postcreate(user):
 	token = request.cookies.get('token')
 	if not token:
 		return redirect("/login")

@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for
 import sys
-from json import loads
+import re
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
@@ -107,17 +107,24 @@ def token_required(f):
 
 	return decorator
 
+filters = ["<script>","</script>","<br>","<",">"]
 
 @app.route('/api/createpost', methods=['POST'])
 @token_required
 def createpost(user):
 	test = request.get_json()
 	try:
+		content = test['content']
+		for filter in filters:
+			if filter in content:
+				content = f"This post by {user.name}, Did not pass the HTML filter"
+		if re.search("(SELECT|INSERT|UPDATE|DELETE)", content):
+			content = f"I {user.name}, tried to inject SQL into NexusFlow."
 		new_post = Posts(pub_id=str(uuid.uuid4()),
-		                 content=test['content'],
-		                 creator=test['creator'],
-		                 parentpost=test['parentpost'],
-		                 subpost=test['subpost'],
+										 content=content,
+										 creator=test['creator'],
+										 parentpost=test['parentpost'],
+										 subpost=test['subpost'],
 										likes = 0,
 										comments = 0)
 		db.session.add(new_post)

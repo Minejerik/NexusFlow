@@ -40,6 +40,7 @@ class Users(db.Model, Serializer):
 	name = db.Column(db.String(50))
 	password = db.Column(db.String(50))
 	pfpurl = db.Column(db.String(150))
+	likedposts = db.Column(db.String())
 	admin = db.Column(db.Boolean)
 
 	def serialize(self):
@@ -132,16 +133,43 @@ def getpost(post_id):
 		create = Users.query.filter_by(public_id=post.creator).first()
 		post = post.__dict__
 		create = create.__dict__
-		time = post['date_created'].strftime("%Y-%m-%d %H:%M:%S")#[:str(post['date_created']).find('.')]
+		time = post['date_created'].strftime("%Y-%m-%d %H:%M:%S")
 		return render_template('postview.html',post=post,create=create,time=time)
 	except Exception as e:
 		return "Unknown Post<br>"+str(e)
 
 @app.route('/')
 def maintemp():
-	return redirect('/login')
+	temp = Posts.query.all()
+	posts = []
+	creates = []
+	for post in temp:
+		posts.append(post.__dict__)
+		create = Users.query.filter_by(public_id=post.creator).first()
+		creates.append(create)
+	return render_template('index.html',posts=posts,creates=creates)
 
 
+@app.route('/api/like', methods=['POST'])
+@token_required
+def likepost(user):
+	test = request.form
+	try:
+		if test['id'] not in str(user.likedposts).split(','):
+			post = Posts.query.filter_by(pub_id=test['id']).first()
+			post.likes = int(post.likes)+1
+			user.likedposts =  str(user.likedposts)+","+str(test['id'])
+			db.session.commit()
+			return jsonify({"error":False})
+		else:
+			post = Posts.query.filter_by(pub_id=test['id']).first()
+			post.likes = int(post.likes)-1
+			user.likedposts =  str(user.likedposts).replace(","+str(test['id']),'')
+			db.session.commit()
+			return jsonify({"error":False})
+	except Exception as e :
+		return jsonify({"error":str(e)})
+		
 # Route for handling the login page logic
 @app.route('/login', methods=['GET', 'POST'])
 def login():

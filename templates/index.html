@@ -10,6 +10,11 @@
 body {
     background:#eee;
 }
+
+a {
+  color: inherit;
+}
+		
 .posts-content{
     margin-top:20px;    
 }
@@ -74,6 +79,22 @@ body {
 					const obj = JSON.parse(text)
 					if (obj.error == false){
 						location.reload()
+					}
+				}
+	      async function del(id) {
+          const resp = await fetch("/api/deletepost", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          });
+          const text = await resp.text();
+					const obj = JSON.parse(text)
+					if (obj.error == false){
+						location.reload()
 					} else {
 						document.write(obj.error)
 					}
@@ -99,8 +120,10 @@ body {
                 <div class="media mb-3">
                   <img src="{{create['pfpurl']}}" class="d-block ui-w-40 rounded-circle" alt="">
                   <div class="media-body ml-3">
+										<a href="/u/{{create['name']}}">
                     {{create['name']}}
-                    <div class="text-muted small">{{post['date_created']}}</div>
+										</a>
+                    <div class="text-muted small">{{post['date_created']}} &nbsp;&nbsp; {% if create['public_id'] == myuser['public_id'] and  post['del_allow'] == True %}<a href="javascript:del('{{post['pub_id']}}')" style="color: red;"> Delete Post</a>{% endif %}</div>
                   </div>
                 </div>
             

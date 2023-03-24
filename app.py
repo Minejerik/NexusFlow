@@ -14,13 +14,17 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-md = Markdown(app,extensions=['footnotes'],)
+md = Markdown(
+ app,
+ extensions=['footnotes'],
+)
 db = SQLAlchemy(app)
 
 
 @app.context_processor
 def inject_now():
-    return {'now': datetime.utcnow()}
+	return {'now': datetime.utcnow()}
+
 
 class Serializer(object):
 
@@ -50,7 +54,7 @@ class Users(db.Model, Serializer):
 
 
 class Posts(db.Model):
-	id = db.Column(db.Integer,primary_key=True,autoincrement=True)
+	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 	pub_id = db.Column(db.String(75))
 	date_created = db.Column(db.DateTime, default=datetime.utcnow)
 	content = db.Column(db.String(2000))
@@ -59,6 +63,7 @@ class Posts(db.Model):
 	subpost = db.Column(db.Integer)
 	likes = db.Column(db.Integer)
 	comments = db.Column(db.Integer)
+	del_allow = db.Column(db.Boolean)
 
 
 with app.app_context():
@@ -107,31 +112,49 @@ def token_required(f):
 
 	return decorator
 
-filters = ["<script>","</script>","<br>","<",">"]
+
+filters = ["<script>", "</script>", "<br>", "<", ">"]
+
+
+def getuserfromtoken(token):
+	if not token:
+		return None
+	try:
+		data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+		current_user = Users.query.filter_by(public_id=data['public_id']).first()
+		return current_user
+	except:
+		return None
+
 
 @app.route('/api/createpost', methods=['POST'])
 @token_required
 def createpost(user):
 	test = request.get_json()
+	delable = True
 	try:
 		content = test['content']
 		for filter in filters:
 			if filter in content:
 				content = f"This post by {user.name}, Did not pass the HTML filter"
-		if re.search("(SELECT|INSERT|UPDATE|DELETE)", content):
+				delable = False
+		if re.search("(SELECT|INSERT|UPDATE|DELETE|DROP|TABLE)", content):
 			content = f"I {user.name}, tried to inject SQL into NexusFlow."
+			delable = False
 		new_post = Posts(pub_id=str(uuid.uuid4()),
-										 content=content,
-										 creator=test['creator'],
-										 parentpost=test['parentpost'],
-										 subpost=test['subpost'],
-										likes = 0,
-										comments = 0)
+		                 content=content,
+		                 creator=test['creator'],
+		                 parentpost=test['parentpost'],
+		                 subpost=test['subpost'],
+		                 likes=0,
+		                 comments=0,
+										del_allow = delable)
 		db.session.add(new_post)
 		db.session.commit()
 	except Exception as e:
 		return jsonify({'error': str(e)})
-	return jsonify({"error": False,"id":new_post.pub_id})
+	return jsonify({"error": False, "id": new_post.pub_id})
+
 
 @app.route('/p/<string:post_id>')
 def getpost(post_id):
@@ -141,9 +164,10 @@ def getpost(post_id):
 		post = post.__dict__
 		create = create.__dict__
 		time = post['date_created'].strftime("%Y-%m-%d %H:%M:%S")
-		return render_template('postview.html',post=post,create=create,time=time)
+		return render_template('postview.html', post=post, create=create, time=time)
 	except Exception as e:
-		return "Unknown Post<br>"+str(e)
+		return "Unknown Post<br>" + str(e)
+
 
 @app.route('/')
 def maintemp():
@@ -154,8 +178,29 @@ def maintemp():
 		posts.append(post.__dict__)
 		create = Users.query.filter_by(public_id=post.creator).first()
 		creates.append(create)
-	return render_template('index.html',posts=posts,creates=creates)
+	myuser = getuserfromtoken(request.cookies.get('token'))
+	if myuser == None:
+		myuser = {}
+	return render_template('index.html',
+	                       posts=posts,
+	                       creates=creates,
+	                       myuser=myuser)
 
+
+
+@app.route('/api/deletepost', methods=['POST'])
+@token_required
+def deletepost(user):
+	test = request.form
+	try:
+		post = Posts.query.filter_by(pub_id=test['id']).first()
+		if post.del_allow == False:
+			return jsonify({"error": True})
+		db.session.delete(post)
+		db.session.commit()
+		return jsonify({"error": False})
+	except Exception as e:
+		return jsonify({"error": str(e)})
 
 @app.route('/api/like', methods=['POST'])
 @token_required
@@ -164,19 +209,24 @@ def likepost(user):
 	try:
 		if test['id'] not in str(user.likedposts).split(','):
 			post = Posts.query.filter_by(pub_id=test['id']).first()
-			post.likes = int(post.likes)+1
-			user.likedposts =  str(user.likedposts)+","+str(test['id'])
+			if post.creator == user.public_id:
+				return jsonify({"error": False})
+			post.likes = int(post.likes) + 1
+			user.likedposts = str(user.likedposts) + "," + str(test['id'])
 			db.session.commit()
-			return jsonify({"error":False})
+			return jsonify({"error": False})
 		else:
 			post = Posts.query.filter_by(pub_id=test['id']).first()
-			post.likes = int(post.likes)-1
-			user.likedposts =  str(user.likedposts).replace(","+str(test['id']),'')
+			if post.creator == user.public_id:
+				return jsonify({"error": False})
+			post.likes = int(post.likes) - 1
+			user.likedposts = str(user.likedposts).replace("," + str(test['id']), '')
 			db.session.commit()
-			return jsonify({"error":False})
-	except Exception as e :
-		return jsonify({"error":str(e)})
-		
+			return jsonify({"error": False})
+	except Exception as e:
+		return jsonify({"error": str(e)})
+
+
 # Route for handling the login page logic
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -201,13 +251,15 @@ def login():
 	else:
 		return render_template('newlogin.html', error=error, log="login")
 
+
 @app.route('/admin')
 @token_required
 def admin(user):
-	if not user: #or user.admin == False:
-		return "Not Found",404
+	if not user or user.admin == False:
+		return "Not Found", 404
 	else:
-		return render_template('admin.html',user=user.__dict__)
+		return render_template('admin.html', user=user.__dict__)
+
 
 @app.route("/home")
 def home():

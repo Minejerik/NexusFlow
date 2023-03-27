@@ -20,10 +20,25 @@ md = Markdown(
 )
 db = SQLAlchemy(app)
 
+
 def contains_sql_statement(input_string):
     sql_pattern = re.compile(r'\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|DROP)\b', re.IGNORECASE)
     match = sql_pattern.search(input_string)
     return match is not None
+
+filters = ["<script>", "</script>", "<br>", "<", ">"]
+allowed = ["<br>", "<", ">"]
+def checkinject(input_string,user):
+	delable = True
+	for filter in filters:
+		for word in input_string.split():
+			if word == filter and word not in allowed:
+				input_string = f"I {user.name}, tried to inject HTML into NexusFlow."
+				delable = False
+	if contains_sql_statement(input_string):
+		input_string = f"I {user.name}, tried to inject SQL into NexusFlow."
+		delable = False
+	return input_string,delable
 
 @app.context_processor
 def inject_now():
@@ -118,7 +133,6 @@ def token_required(f):
 	return decorator
 
 
-filters = ["<script>", "</script>", "<br>", "<", ">"]
 
 
 def getuserfromtoken(token):
@@ -139,13 +153,7 @@ def createpost(user):
 	delable = True
 	try:
 		content = test['content']
-		for filter in filters:
-			if filter in content:
-				content = f"This post by {user.name}, Did not pass the HTML filter"
-				delable = False
-		if contains_sql_statement(content):
-			content = f"I {user.name}, tried to inject SQL into NexusFlow."
-			delable = False
+		content,delable  = checkinject(content,user)
 		new_post = Posts(pub_id=str(uuid.uuid4()),
 		                 content=content,
 		                 creator=test['creator'],
@@ -197,10 +205,16 @@ def maintemp():
 @token_required
 def deletepost(user):
 	test = request.form
+	if not test:
+		return jsonify({"error": True}),400
+	if test['id'] == None:
+		return jsonify({"error": True}),400
 	try:
 		post = Posts.query.filter_by(pub_id=test['id']).first()
 		if post.del_allow == False:
-			return jsonify({"error": True})
+			return jsonify({"error": True}),400
+		if user.admin == False and user.public_id != post['creator']:
+			return jsonify({"error": True}),401
 		db.session.delete(post)
 		db.session.commit()
 		return jsonify({"error": False})
@@ -240,7 +254,7 @@ def login():
 		auth = request.form
 		user = Users.query.filter_by(name=auth['name']).first()
 		if not user:
-			return jsonify({"correct": False})
+			return jsonify({"correct": False,"error": "User does not exist"})
 		if check_password_hash(user.password, auth['password']):
 			token = jwt.encode(
 			 {
@@ -252,7 +266,7 @@ def login():
 			print('YIPPE')
 			return ret
 		print('bad')
-		return jsonify({"correct": False})
+		return jsonify({"correct": False,"error": "Incorrect Username or Password"})
 	else:
 		return render_template('newlogin.html', error=error, log="login")
 
@@ -307,10 +321,16 @@ def showuser(user):
 def setsettings(user):
 	try:
 		test = request.json
+		userlist = Users.query.filter_by(name=test['name']).first()
+		if userlist:
+			return jsonify({"error": "Username already taken"})
 		user.name = test['name']
 		user.bio = test['bio']
 		if test['password'] != None and test['password'] != '':
-			user.password = generate_password_hash(test['password'], method='sha256')
+			temp = generate_password_hash(test['password'], method='sha256')
+			if temp == user.password:
+				return jsonify({"error": "Password is the same"})
+			user.password = temp
 		db.session.commit()
 		return jsonify({"error": False})
 	except Exception as e:
@@ -342,14 +362,24 @@ def getpostcontent(user):
 @app.route('/api/editpost', methods=['POST'])
 @token_required
 def editpost(user):
+	if not request.form:
+		return jsonify({"error": True}),400
 	id = request.form['id']
-	content = request.form['content']
-	post = Posts.query.filter_by(pub_id=id).first()
-	if not post:
-		return jsonify({"error": True})
-	post.content = content
-	post.edited = True
-	db.session.commit()
+	try:
+		content,delable = checkinject(request.form['content'],user)
+		post = Posts.query.filter_by(pub_id=id).first()
+		if not post:
+			return jsonify({"error": True}),404
+		if post.creator != user.public_id and user.admin == False:
+			return jsonify({"error": True}),401
+		if post.del_allow == False:
+			return jsonify({"error": True}),403
+		post.content = content
+		post.edited = True
+		post.del_allow = delable
+		db.session.commit()
+	except Exception as e:
+		return jsonify({"error": str(e)}),400
 	return jsonify({"error": False})
 
 @app.route('/post/create')
@@ -364,14 +394,6 @@ def postcreate(user):
 		return redirect('/login')
 	return render_template('post_create.html',myuser = user)
 
-
-@app.route('/header')
-def header():
-	myuser = getuserfromtoken(request.cookies.get('token'))
-	if myuser == None:
-		myuser = {}
-
-	return render_template('header.html', user=myuser)
 
 if __name__ == '__main__':
 	app.run(host='0.0.0.0', port=81, debug=True)

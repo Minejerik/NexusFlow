@@ -42,7 +42,7 @@
           if (obj.correct === true) {
             window.location.href = "/u/" + name;
           } else {
-            error.innerHTML = 'Wrong username or password';
+            error.innerHTML = obj.error;
           }
         }
       </script>

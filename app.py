@@ -1,24 +1,34 @@
-from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for, send_file
+from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for, send_file, flash
 import sys
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
+from werkzeug.utils import secure_filename
 import uuid
 from flaskext.markdown import Markdown
 from sqlalchemy.inspection import inspect
 import jwt
 from datetime import datetime, timedelta
 
+UPLOAD_FOLDER = '/static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 md = Markdown(
  app,
  extensions=['footnotes'],
 )
 db = SQLAlchemy(app)
+
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def contains_sql_statement(input_string):
@@ -27,7 +37,7 @@ def contains_sql_statement(input_string):
     return match is not None
 
 filters = ["<script>", "</script>", "<br>", "<", ">"]
-allowed = ["<br>", "<", ">"]
+allowed = ["<br>", "<", ">","<img>"]
 def checkinject(input_string,user):
 	delable = True
 	for filter in filters:
@@ -277,7 +287,7 @@ def admin(user):
 	if not user or user.admin == False:
 		return "Not Found", 404
 	else:
-		return render_template('admin.html', user=user.__dict__)
+		return render_template('admin.html', user=user.__dict__, users=Users.query.all())
 
 @app.route('/admin/<string:current_user>')
 @token_required
@@ -368,6 +378,7 @@ def showuser(user):
 def setsettings(user):
 	try:
 		test = request.json
+		print(test)
 		userlist = Users.query.filter_by(name=test['name']).first()
 		if userlist and user.name != test['name']:
 			return jsonify({"error": "Username already taken"})

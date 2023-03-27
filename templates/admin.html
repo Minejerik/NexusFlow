@@ -80,11 +80,15 @@
                           <i class="fa fa-search"></i>
                           <input type="text" class="form-control" placeholder="Username?">
                           <button class="btn btn-primary" onclick="searchuser()"+>Search</button>
+                          {% for user in users %}
+                          <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="/admin/{{user.name}}">{{user.name}}</a></div>
+                          {% endfor %}
                         </div>
                         
-                      </div>
+                      </div><br>
                       
                     </div>
+                    
                 </div>
 </body>
 </html>

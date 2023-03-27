@@ -20,6 +20,10 @@ md = Markdown(
 )
 db = SQLAlchemy(app)
 
+def contains_sql_statement(input_string):
+    sql_pattern = re.compile(r'\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|DROP)\b', re.IGNORECASE)
+    match = sql_pattern.search(input_string)
+    return match is not None
 
 @app.context_processor
 def inject_now():
@@ -64,6 +68,7 @@ class Posts(db.Model):
 	likes = db.Column(db.Integer)
 	comments = db.Column(db.Integer)
 	del_allow = db.Column(db.Boolean)
+	edited = db.Column(db.Boolean)
 
 
 with app.app_context():
@@ -138,7 +143,7 @@ def createpost(user):
 			if filter in content:
 				content = f"This post by {user.name}, Did not pass the HTML filter"
 				delable = False
-		if re.search("(SELECT|INSERT|UPDATE|DELETE|DROP|TABLE)", content):
+		if contains_sql_statement(content):
 			content = f"I {user.name}, tried to inject SQL into NexusFlow."
 			delable = False
 		new_post = Posts(pub_id=str(uuid.uuid4()),
@@ -278,17 +283,13 @@ badgelist = {
 @app.route('/api/getsettings')
 @token_required
 def getsettings(current_user):
-	return jsonify(current_user.password)
+	return jsonify({"name": current_user.name,"bio": current_user.bio,"pfpurl": current_user.pfpurl})
 
 
 @app.route('/settings')
-def settings():
-	token = request.cookies.get('token')
-	if not token:
-		return redirect("/u/minejerik")
-	data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-	current_user = Users.query.filter_by(public_id=data['public_id']).first()
-	return render_template('settings.html')
+@token_required
+def settings(user):
+	return render_template('settings.html',myuser=user)
 
 
 @app.route('/u/<string:user>')
@@ -300,6 +301,20 @@ def showuser(user):
 	                       user=userlist,
 	                       badges=[*str(userlist.badges)],
 	                       badgelist=badgelist)
+
+@app.route('/api/setsettings', methods=['POST'])
+@token_required
+def setsettings(user):
+	try:
+		test = request.json
+		user.name = test['name']
+		user.bio = test['bio']
+		if test['password'] != None and test['password'] != '':
+			user.password = generate_password_hash(test['password'], method='sha256')
+		db.session.commit()
+		return jsonify({"error": False})
+	except Exception as e:
+		return jsonify({"error": str(e)})
 
 
 @app.route('/api/getid')
@@ -315,6 +330,27 @@ def getid():
 		return jsonify({"userid": False, 'error': str(e)})
 	return jsonify({"userid": id})
 
+@app.route('/api/getpost', methods=['POST'])
+@token_required
+def getpostcontent(user):
+	id = request.form['id']
+	post = Posts.query.filter_by(pub_id=id).first()
+	if not post:
+		return jsonify({"error": True,"post":"post not found"})
+	return jsonify({"error": False, "post": post.content})
+
+@app.route('/api/editpost', methods=['POST'])
+@token_required
+def editpost(user):
+	id = request.form['id']
+	content = request.form['content']
+	post = Posts.query.filter_by(pub_id=id).first()
+	if not post:
+		return jsonify({"error": True})
+	post.content = content
+	post.edited = True
+	db.session.commit()
+	return jsonify({"error": False})
 
 @app.route('/post/create')
 @token_required
@@ -326,8 +362,16 @@ def postcreate(user):
 		jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
 	except:
 		return redirect('/login')
-	return render_template('post_create.html')
+	return render_template('post_create.html',myuser = user)
 
+
+@app.route('/header')
+def header():
+	myuser = getuserfromtoken(request.cookies.get('token'))
+	if myuser == None:
+		myuser = {}
+
+	return render_template('header.html', user=myuser)
 
 if __name__ == '__main__':
 	app.run(host='0.0.0.0', port=81, debug=True)

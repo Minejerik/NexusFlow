@@ -15,7 +15,7 @@
 <body>
     <script>
         async function post() {
-            const cont = document.getElementById('postcontent').value
+            const cont = document.getElementById('body').value
 
             let j = {}
 
@@ -38,14 +38,22 @@
                 method: "POST"
             })
             const resptxt = await resp2.text()
-						const tempa = JSON.parse(resptxt)
+			const tempa = JSON.parse(resptxt)
             window.location.href = "/"
         }
     </script>
     {% set user = myuser %}
 {% include "header.html" %}
-    <textarea rows="5" cols="60" name="description" id="postcontent" placeholder="Post Content" style="border-left: 15px;"></textarea><br>
-    <button onclick="post()">Post</button>
+<div class="container py-5">
+    <h1 class="mb-4">Create a Post</h1>
+    <form onsubmit="javascript:post()">
+      <div class="mb-3">
+        <textarea class="form-control" id="body" rows="5"></textarea>
+        <small class="form-text text-muted">The only permitted HTML is the  &lt;br&gt;  tag.</small>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+  </div>
 </body>
 
 </html>

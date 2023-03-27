@@ -64,6 +64,12 @@
 
        }</style>
 <body>
+  <script>
+    function searchuser(){
+      var username = document.getElementsByClassName("form-control")[0].value;
+      window.location.href = "/admin/"+username;
+    }
+  </script>
 <div class="container">
 
                     <div class="row height d-flex justify-content-center align-items-center">
@@ -73,7 +79,7 @@
                         <div class="search">
                           <i class="fa fa-search"></i>
                           <input type="text" class="form-control" placeholder="Username?">
-                          <button class="btn btn-primary">Search</button>
+                          <button class="btn btn-primary" onclick="searchuser()"+>Search</button>
                         </div>
                         
                       </div>

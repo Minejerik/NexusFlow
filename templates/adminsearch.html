@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Search | {{user['name']}}</title>
+</head>
+<body>
+    <script>
+        function updateUser(){
+            var name = document.getElementById("name").value;
+            var bio = document.getElementById("bio").value;
+            var admin = document.getElementById("admin").checked;
+            var pfp = document.getElementById("pfp").value;
+            var id = '{{user["public_id"]}}';
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    alert(this.responseText);
+                }
+            };
+            xhttp.open("POST", "/api/setuser", true);
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.send("name="+name+"&bio="+bio+"&admin="+admin+"&pfp="+pfp+"&id="+id);
+        }
+
+        function deleteUser(){
+            var id = '{{user["public_id"]}}';
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    alert(this.responseText);
+                }
+            };
+            xhttp.open("POST", "/api/deleteuser", true);
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.send("id="+id);
+        }
+    </script>
+    <h3>Admin Search</h3>
+    <h3>Change User Settings</h3>
+    <label for="name">username:</label>
+    <input type="text" id="name" value="{{user['name']}}"><br><br>
+    <label for="bio">user bio:</label>
+    <textarea id="bio">{{user['bio']}}</textarea><br><br>
+    <label for="admin">is admin?:</label>
+    {% if user.admin == True%}
+        <input type="checkbox" id="admin" checked>
+    {% else %}
+        <input type="checkbox" id="admin">
+    {% endif %}
+    <br><br>
+    <label for="pfp">pfpurl:</label>
+    <input type="text" id="pfp" value="{{user['pfpurl']}}">
+    <br><br>
+    <button onclick="updateUser()">Update User</button>
+    <br><br>
+    <h3>Delete User</h3>
+    <button onclick="deleteUser()">Delete User</button>
+</body>
+</html>

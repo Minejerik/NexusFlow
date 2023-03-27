@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for
+from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for, send_file
 import sys
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -89,6 +89,9 @@ class Posts(db.Model):
 with app.app_context():
 	db.create_all()
 
+@app.route('/assets/<path:path>')
+def send_assets(path):
+	return send_file("static\\assets\\"+path)
 
 @app.route('/register', methods=['POST', 'GET'])
 def signup_user():
@@ -97,23 +100,20 @@ def signup_user():
 	else:
 		data = request.form
 		userlist = Users.query.filter_by(name=data['name']).first()
-		if userlist:
-			return render_template('login.html',
-			                       log="register",
-			                       error="User already exists")
-		app.logger.info(data)
+		if userlist is not None:
+			print("User already exists!")
+			return jsonify({'error': 'User already exists!'})
 		hashed_password = generate_password_hash(data['password'], method='sha256')
 		new_user = Users(public_id=str(uuid.uuid4()),
 		                 name=data['name'],
 		                 badges=0,
 		                 bio="This is the test biography",
 		                 password=hashed_password,
-		                 pfpurl="https://placekitten.com/512/512",
+		                 pfpurl="/assets/newuser.png",
 		                 admin=False)
 		db.session.add(new_user)
 		db.session.commit()
-		return redirect("/login")
-
+		return jsonify({'error': False, 'redirect': '/login'})
 
 def token_required(f):
 
@@ -211,9 +211,11 @@ def deletepost(user):
 		return jsonify({"error": True}),400
 	try:
 		post = Posts.query.filter_by(pub_id=test['id']).first()
-		if post.del_allow == False:
-			return jsonify({"error": True}),400
-		if user.admin == False and user.public_id != post['creator']:
+		if post.del_allow == False and user.admin == False:
+			post.content = "I tried to delete this post, but it was not allowed."
+			db.session.commit()
+			return jsonify({"error": False}),400
+		if user.admin == False and user.public_id != post.creator:
 			return jsonify({"error": True}),401
 		db.session.delete(post)
 		db.session.commit()
@@ -254,19 +256,17 @@ def login():
 		auth = request.form
 		user = Users.query.filter_by(name=auth['name']).first()
 		if not user:
-			return jsonify({"correct": False,"error": "User does not exist"})
+			return jsonify({"error": "User does not exist"})
 		if check_password_hash(user.password, auth['password']):
 			token = jwt.encode(
 			 {
 			  'public_id': user.public_id,
 			  'exp': datetime.utcnow() + timedelta(minutes=240)
 			 }, app.config['SECRET_KEY'], 'HS256')
-			ret = make_response(jsonify({"correct": True, "token": token}))
+			ret = make_response(jsonify({"error": False, "token": token, "redirect": "/"}))
 			ret.set_cookie('token', token)
-			print('YIPPE')
 			return ret
-		print('bad')
-		return jsonify({"correct": False,"error": "Incorrect Username or Password"})
+		return jsonify({"error": "Incorrect Username or Password"})
 	else:
 		return render_template('newlogin.html', error=error, log="login")
 
@@ -279,11 +279,58 @@ def admin(user):
 	else:
 		return render_template('admin.html', user=user.__dict__)
 
+@app.route('/admin/<string:current_user>')
+@token_required
+def adminuser(user, current_user):
+	if not user or user.admin == False:
+		return "Not Found", 404
+	else:
+		cur = Users.query.filter_by(name=current_user).first()
+		if not cur:
+			return "Not Found", 404
+		return render_template('adminsearch.html', user=cur, current_user=user)
 
 @app.route("/home")
 def home():
 	return redirect('')
 
+@app.route('/api/setuser', methods=['POST'])
+@token_required
+def setuser(user):
+	if user.admin == False:
+		return jsonify({"error": True}),401
+	test = request.form
+	if not test:
+		return jsonify({"error": True}),400
+	try:
+		user = Users.query.filter_by(public_id=test['id']).first()
+		user.name = test['name']
+		user.bio = test['bio']
+		user.pfpurl = test['pfp']
+		if test['admin'] == "true":
+			user.admin = True
+		else:
+			user.admin = False
+		db.session.commit()
+		return jsonify({"error": False})
+	except Exception as e:
+		return jsonify({"error": str(e)})
+
+@app.route('/api/deleteuser', methods=['POST'])
+@token_required
+def deleteuser(user):
+	if user.admin == False:
+		return jsonify({"error": True}),401
+	test = request.form
+	if not test:
+		return jsonify({"error": True}),400
+	try:
+		user = Users.query.filter_by(public_id=test['id']).first()
+		db.session.delete(user)
+		db.session.commit()
+		return jsonify({"error": False})
+	except Exception as e:
+		return jsonify({"error": str(e)})
 
 badgelist = {
  "0": "User",
@@ -322,7 +369,7 @@ def setsettings(user):
 	try:
 		test = request.json
 		userlist = Users.query.filter_by(name=test['name']).first()
-		if userlist:
+		if userlist and user.name != test['name']:
 			return jsonify({"error": "Username already taken"})
 		user.name = test['name']
 		user.bio = test['bio']
@@ -359,6 +406,8 @@ def getpostcontent(user):
 		return jsonify({"error": True,"post":"post not found"})
 	return jsonify({"error": False, "post": post.content})
 
+
+
 @app.route('/api/editpost', methods=['POST'])
 @token_required
 def editpost(user):
@@ -371,9 +420,15 @@ def editpost(user):
 		if not post:
 			return jsonify({"error": True}),404
 		if post.creator != user.public_id and user.admin == False:
-			return jsonify({"error": True}),401
-		if post.del_allow == False:
-			return jsonify({"error": True}),403
+			post.content = post.content + f"<br> {user.name} felt it was necessary to try and edit this post."
+			post.edited = post.edited
+			db.session.commit()
+			return jsonify({"error": f"nuh uh {user.name}"}),401
+		if post.del_allow == False and post.creator == user.public_id:
+			post.content = "I tried to edit this post, but I broke the rules in the past and was not allowed to."
+			post.edited = True
+			db.session.commit()
+			return jsonify({"error": f"nuh uh {user.name}"}),403
 		post.content = content
 		post.edited = True
 		post.del_allow = delable

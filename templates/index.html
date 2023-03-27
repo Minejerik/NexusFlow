@@ -45,6 +45,14 @@ a {
     -ms-flex-negative: 1;
     flex-shrink: 1;
 }
+
+#admin{
+  background-color: lightgreen;
+  border-radius: 5px;
+  display: inline;
+  padding: 3px;
+}
+
 .bg-dark {
     background-color: rgba(24,28,33,0.9) !important;
 }
@@ -178,9 +186,9 @@ a {
                   <div class="d-flex align-items-center">
                     <img src="{{create['pfpurl']}}" class="d-block ui-w-40 rounded-circle" alt=""> &nbsp;&nbsp;
                     <div class="media-body ml-3">
-                      <a href="/u/{{create['name']}}">{{create['name']}}</a>
+                      <a href="/u/{{create['name']}}">{{create['name']}}{% if create.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}
                     </div>&nbsp;&nbsp;&nbsp;&nbsp;
-                    <div class="text-muted small">{{post['date_created']}} &nbsp;&nbsp; {% if create['public_id'] == myuser['public_id'] and  post['del_allow'] == True %}<a href="javascript:del('{{post['pub_id']}}')" style="color: red;"> Delete Post</a>&nbsp;&nbsp;<a href="javascript:edit('{{post['pub_id']}}')" style="color: blue;" id="editbut{{post['pub_id']}}"> Edit Post</a>{% endif %}</div>
+                    <div class="text-muted small">{{post['date_created']}} &nbsp;&nbsp; {% if create['public_id'] == myuser['public_id'] and  post['del_allow'] == True or myuser['admin'] ==True %}<a href="javascript:del('{{post['pub_id']}}')" style="color: red;"> Delete Post</a>&nbsp;&nbsp;<a href="javascript:edit('{{post['pub_id']}}')" style="color: blue;" id="editbut{{post['pub_id']}}"> Edit Post</a>{% endif %}</div>
                   </div>
                 </div>
                 <div id="content{{post['pub_id']}}">

@@ -24,6 +24,7 @@
           const name = document.getElementById("inputEmail").value;
           const pass = document.getElementById("inputPassword").value;
           const error = document.getElementById("error");
+          console.log(name, pass);
           const resp = await fetch(url, {
             method: "POST",
             headers: {
@@ -36,20 +37,20 @@
               encodeURIComponent(pass),
           });
           const text = await resp.text();
-          console.log(text);
-          const obj = JSON.parse(text);
-          console.log(obj.token);
-          if (obj.correct === true) {
-            window.location.href = "/u/" + name;
+          const obj = await JSON.parse(text);
+          if (obj.error == false) {
+            console.log("here");
+            document.location.href = obj.redirect;
           } else {
-            error.innerHTML = obj.error;
+            console.log(obj.error);
+            error.textContent = obj.error;
           }
         }
       </script>
 	
   <body class="text-center">
-		      {% if log == "login" %}
-     <form class="form-signin" onsubmit="send('/login')">
+		  {% if log == "login" %}
+      <form class="form-signin" onsubmit="send('/login')">
       {% else %}
       <form class="form-signin" onsubmit="send('/register')">
       {% endif %}

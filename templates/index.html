@@ -177,6 +177,7 @@ a {
 {% for i in range(posts|length) %}
 {% set post = posts[i] %}
 {% set create = creates[i] %}
+{% if post.isreply == False %}
 <div class="container posts-content">
     <div class="row">
         <div class="col-lg-6">
@@ -200,9 +201,14 @@ a {
               </div>
               <div class="card-footer">
                 <a href="javascript:send('{{post['pub_id']}}')" class="d-inline-block text-muted">
-                    <strong>{{post['likes']}}</strong> Likes
+                    
+                  {% if post['pub_id'] in likes %}
+                  <strong>{{post['likes']}}</strong> Liked
+              {% else %}
+                  <strong>{{post['likes']}}</strong> Likes
+              {% endif %}
                 </a>
-                <a href="javascript:void(0)" class="d-inline-block text-muted ml-3">
+                <a href="/p/{{post['pub_id']}}" class="d-inline-block text-muted ml-3">
                     <strong>{{post['comments']}}</strong> Comments
                 </a>
                 &nbsp;&nbsp;
@@ -214,6 +220,7 @@ a {
         </div>
 </div>
 </div>
+{% endif %}
 {% endfor %}
 
 <h1 style="padding-left:150px;">No More Posts Found</h1>

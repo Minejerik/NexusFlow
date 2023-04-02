@@ -74,6 +74,7 @@ class Users(db.Model, Serializer):
 	password = db.Column(db.String(50))
 	pfpurl = db.Column(db.String(150))
 	likedposts = db.Column(db.String())
+	posts = db.Column(db.String())
 	admin = db.Column(db.Boolean)
 
 	def serialize(self):
@@ -93,6 +94,7 @@ class Posts(db.Model):
 	likes = db.Column(db.Integer)
 	comments = db.Column(db.Integer)
 	del_allow = db.Column(db.Boolean)
+	isreply = db.Column(db.Boolean)
 	edited = db.Column(db.Boolean)
 
 
@@ -168,46 +170,121 @@ def createpost(user):
 		                 content=content,
 		                 creator=test['creator'],
 		                 parentpost=test['parentpost'],
+				 		isreply=False,
 		                 subpost=test['subpost'],
 		                 likes=0,
 		                 comments=0,
-										del_allow = delable)
+						del_allow = delable)
 		db.session.add(new_post)
 		db.session.commit()
 	except Exception as e:
 		return jsonify({'error': str(e)})
+	if user.posts == None:
+		user.posts = str(new_post.pub_id)
+		db.session.commit()
+	else:
+		user.posts = str(user.posts) + ',' +str(new_post.pub_id)
+		db.session.commit()
+	print(user.posts)
 	return jsonify({"error": False, "id": new_post.pub_id})
 
+@app.route('/api/createreply', methods=['POST'])
+@token_required
+def createreply(user):
+	test = request.get_json()
+	delable = True
+	try:
+		temp = test['id']
+		parent = Posts.query.filter_by(pub_id=temp).first()
+		parent.comments += 1
+		content = test['content']
+		content,delable  = checkinject(content,user)
+		new_post = Posts(pub_id=str(uuid.uuid4()),
+		                 content=content,
+		                 creator=user.public_id,
+		                 parentpost=test['id'],
+		                 subpost="",
+		                 likes=0,
+				 		isreply=True,
+		                 comments=0,
+						del_allow = delable)
+		parent.subpost = str(parent.subpost) + ',' + str(new_post.pub_id)
+		db.session.add(new_post)
+		db.session.commit()
+	except Exception as e:
+		return jsonify({'error': str(e)})
+	print(user.posts)
+	return jsonify({"error": False, "id": new_post.pub_id})
 
 @app.route('/p/<string:post_id>')
 def getpost(post_id):
+	myuser = getuserfromtoken(request.cookies.get('token'))
+	if myuser == None:
+		myuser = {}
 	try:
 		post = Posts.query.filter_by(pub_id=post_id).first()
 		create = Users.query.filter_by(public_id=post.creator).first()
 		post = post.__dict__
 		create = create.__dict__
 		time = post['date_created'].strftime("%Y-%m-%d %H:%M:%S")
-		return render_template('postview.html', post=post, create=create, time=time)
+		subposts = post['subpost']
+		sub = []
+		subcreate = []
+		if subposts == None:
+			sub = []
+		else:
+			subposts = subposts.split(',')
+			for h in subposts:
+				h = Posts.query.filter_by(pub_id=h).first()
+				sub.append(h)
+			sub = sub[1:]
+			for h in sub:
+				if h == None:
+					continue
+				h = h.__dict__
+				create = Users.query.filter_by(public_id=h['creator']).first()
+				subcreate.append(create)
+		return render_template('postview.html', post=post, create=create, time=time, myuser=myuser, sub=sub, subcreate=subcreate)
 	except Exception as e:
 		return "Unknown Post<br>" + str(e)
 
 
 @app.route('/')
-def maintemp():
+def mainpage():
 	temp = Posts.query.all()
 	posts = []
 	creates = []
 	for post in temp:
-		posts.append(post.__dict__)
+		# posts.append(post.__dict__)
+		matches = re.findall(r'/u/(\S+)', post.content)
+		pst = post.__dict__
+		if matches != None:
+			for us in matches:
+				print(us)
+				cont = pst['content']
+				user = Users.query.filter_by(name=us).first()
+				if user != None:
+					cont = cont.replace('u/' + us, f'<a href="/u/{us}">u/{us}</a>')
+					pst['content'] = cont
+		posts.append(pst)
 		create = Users.query.filter_by(public_id=post.creator).first()
 		creates.append(create)
 	myuser = getuserfromtoken(request.cookies.get('token'))
 	if myuser == None:
 		myuser = {}
+	likes = []
+	if myuser != {}:
+		if str(myuser.likedposts) != None:
+			likes = str(myuser.likedposts).split(',')
+	# likes = list(filter('None', likes))
+	if 'None' in likes:
+		likes.remove('None')
 	return render_template('index.html',
 	                       posts=posts,
 	                       creates=creates,
-	                       myuser=myuser)
+	                       myuser=myuser,
+			       			likes=likes,
+						   )
 
 
 
@@ -221,6 +298,7 @@ def deletepost(user):
 		return jsonify({"error": True}),400
 	try:
 		post = Posts.query.filter_by(pub_id=test['id']).first()
+		creator = Users.query.filter_by(public_id=post.creator).first()
 		if post.del_allow == False and user.admin == False:
 			post.content = "I tried to delete this post, but it was not allowed."
 			db.session.commit()
@@ -228,6 +306,10 @@ def deletepost(user):
 		if user.admin == False and user.public_id != post.creator:
 			return jsonify({"error": True}),401
 		db.session.delete(post)
+		if len(str(creator.posts).split(',')) > 1: 
+			creator.posts = str(creator.posts).replace(','+str(test['id']), "")
+		else:
+			creator.posts = str(creator.posts).replace(str(test['id']), "")
 		db.session.commit()
 		return jsonify({"error": False})
 	except Exception as e:
@@ -300,8 +382,7 @@ def adminuser(user, current_user):
 			return "Not Found", 404
 		return render_template('adminsearch.html', user=cur, current_user=user)
 
-@app.route("/home")
-def home():
+
 	return redirect('')
 
 @app.route('/api/setuser', methods=['POST'])
@@ -367,11 +448,16 @@ def settings(user):
 def showuser(user):
 	userlist = Users.query.filter_by(name=user).first()
 	if not userlist:
-		return f"User {user}: not found"
-	return render_template('user.html',
-	                       user=userlist,
-	                       badges=[*str(userlist.badges)],
-	                       badgelist=badgelist)
+		return f"User {user}: not found", 404
+	posts = []
+	myuser = getuserfromtoken(request.cookies.get('token'))
+	if userlist.posts != "" and userlist.posts != None:
+		for post in str(userlist.posts).split(','):
+			posts.append(Posts.query.filter_by(pub_id=post).first())
+	posts = list(filter(None, posts))
+	if myuser == None:
+		myuser = {}
+	return render_template('newuser.html',myuser=myuser,taruser=userlist,badges=[*str(userlist.badges)],badgelist=badgelist,posts = posts)
 
 @app.route('/api/setsettings', methods=['POST'])
 @token_required
@@ -423,13 +509,14 @@ def getpostcontent(user):
 @token_required
 def editpost(user):
 	if not request.form:
-		return jsonify({"error": True}),400
+		return jsonify({"error": "malformed request"}),400
 	id = request.form['id']
 	try:
 		content,delable = checkinject(request.form['content'],user)
 		post = Posts.query.filter_by(pub_id=id).first()
 		if not post:
-			return jsonify({"error": True}),404
+			return jsonify({"error": "post not found"}),404
+		print(post.creator,user.public_id,user.admin)
 		if post.creator != user.public_id and user.admin == False:
 			post.content = post.content + f"<br> {user.name} felt it was necessary to try and edit this post."
 			post.edited = post.edited

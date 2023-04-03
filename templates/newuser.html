@@ -69,6 +69,19 @@
         .default-style .ui-bordered {
             border: 1px solid rgba(24,28,33,0.06);
         }
+
+
+				#followbutton{
+					border: none;
+					border-radius:5px;
+					background-color:blue;
+				}
+
+				#blockbutton{
+					border: none;
+					border-radius:5px;
+					background-color:red;
+				}
                 
     </style>
     <script>
@@ -168,6 +181,16 @@
         window.onbeforeunload = function(e) {
             localStorage.setItem('scrollpos', window.scrollY);
         };
+
+				async function follow(id){
+					alert("starting to follow "+id)
+				}
+
+				async function block(id){
+					alert("starting to block "+id)
+				}
+
+				
 </script>
 </head>
 <body>
@@ -180,6 +203,14 @@
                     <div class="card-body text-center">
                         <img src="{{taruser.pfpurl}}" alt="Profile Picture" class="rounded-circle mb-3" width="150px">
                         <h4>{{taruser.name}}</h4>
+											<small>
+												Following: {{taruser.followingcount}}
+												Followers: {{taruser.followercount}}<br>
+											</small>
+												{% if taruser.name == myuser.name %}
+											
+													<button id="followbutton" onclick="follow('{{taruser.public_id}}')">Follow</button> <button id="blockbutton" onclick="block('{{taruser.public_id}}')">Block</button>
+												{% endif %}
                         <hr>
                         <p class="text-muted">{{taruser.bio|markdown}}</p>
                     </div>

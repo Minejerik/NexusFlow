@@ -68,6 +68,22 @@ async = ["asgiref (>=3.2)"]
 dotenv = ["python-dotenv"]
 
 [[package]]
+name = "flask-admin"
+version = "1.6.1"
+description = "Simple and extensible admin interface framework for Flask"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+Flask = ">=0.7"
+wtforms = "*"
+
+[package.extras]
+aws = ["boto"]
+azure = ["azure-storage-blob"]
+
+[[package]]
 name = "flask-htmldoom"
 version = "0.2.1"
 description = "htmldoom integration for Flask"
@@ -236,10 +252,24 @@ MarkupSafe = ">=2.1.1"
 [package.extras]
 watchdog = ["watchdog"]
 
+[[package]]
+name = "wtforms"
+version = "3.0.1"
+description = "Form validation and rendering for Python web development."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+MarkupSafe = "*"
+
+[package.extras]
+email = ["email-validator"]
+
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "dbc7739f1ce14ba788e99b8c1a00ed0cbe78a36dfd7953159a159f4bd81d653b"
+content-hash = "2262527285da11612e2519300b44fdfef8ce536d1bf63ae8026378bdb3d7f121"
 
 [metadata.files]
 cffi = []
@@ -247,6 +277,7 @@ click = []
 colorama = []
 cryptography = []
 flask = []
+flask-admin = []
 flask-htmldoom = []
 flask-sqlalchemy = []
 greenlet = []
@@ -260,3 +291,4 @@ pyyaml = []
 sqlalchemy = []
 typing-extensions = []
 werkzeug = []
+wtforms = []

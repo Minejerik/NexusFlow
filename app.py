@@ -5,6 +5,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 from werkzeug.utils import secure_filename
+from flask_admin.contrib.sqla import ModelView
+from flask_admin import Admin
 import uuid
 from flaskext.markdown import Markdown
 from sqlalchemy.inspection import inspect
@@ -19,6 +21,7 @@ app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
 md = Markdown(
  app,
  extensions=['footnotes'],
@@ -30,6 +33,13 @@ def allowed_file(filename):
 	return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def human_format(num):
+    num = float('{:.3g}'.format(num))
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'K', 'M', 'B', 'T'][magnitude])
 
 def contains_sql_statement(input_string):
 	sql_pattern = re.compile(r'\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|DROP)\b',
@@ -59,6 +69,10 @@ def checkinject(input_string, user):
 def inject_now():
 	return {'now': datetime.utcnow()}
 
+@app.template_filter('format')
+def format(num):
+	return human_format(num)
+
 
 class Serializer(object):
 
@@ -72,11 +86,10 @@ class Serializer(object):
 
 class Users(db.Model, Serializer):
 	id = db.Column(db.Integer, primary_key=True)
-	public_id = db.Column(db.Integer)
-	badges = db.Column(db.Integer)
+	public_id = db.Column(db.String())
 	bio = db.Column(db.String(150))
 	name = db.Column(db.String(50))
-	password = db.Column(db.String(50))
+	password = db.Column(db.String(500))
 	pfpurl = db.Column(db.String(150))
 	likedposts = db.Column(db.String(), default="")
 	followers = db.Column(db.String(), default="")
@@ -87,20 +100,14 @@ class Users(db.Model, Serializer):
 	posts = db.Column(db.String(), default="")
 	admin = db.Column(db.Boolean)
 
-	def serialize(self):
-		d = Serializer.serialize(self)
-		del d['password']
-		return d
-
-
 class Posts(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 	pub_id = db.Column(db.String(75))
 	date_created = db.Column(db.DateTime, default=datetime.utcnow)
 	content = db.Column(db.String(2000))
-	parentpost = db.Column(db.Integer)
+	parentpost = db.Column(db.String())
 	creator = db.Column(db.String(50))
-	subpost = db.Column(db.Integer)
+	subpost = db.Column(db.String())
 	likes = db.Column(db.Integer)
 	comments = db.Column(db.Integer)
 	del_allow = db.Column(db.Boolean)
@@ -111,10 +118,17 @@ class Posts(db.Model):
 with app.app_context():
 	db.create_all()
 
+admin = Admin(app, name='NexusFlow', template_mode='bootstrap3')
+admin.add_view(ModelView(Users, db.session))
+admin.add_view(ModelView(Posts, db.session))
+
 
 @app.route('/assets/<path:path>')
 def send_assets(path):
-	return send_file("static/assets/" + path)
+	try:
+		return send_file("static/assets/" + path)
+	except:
+		return "Not Found", 404
 
 
 @app.route('/register', methods=['POST', 'GET'])
@@ -149,6 +163,8 @@ def token_required(f):
 			return jsonify({'message': 'a valid token is missing'})
 		try:
 			data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
+			if data['ip'] != request.remote_addr:
+				return redirect('/login'), 401
 			current_user = Users.query.filter_by(public_id=data['public_id']).first()
 		except Exception as e:
 			return jsonify({'message': 'token is invalid', 'error': str(e)})
@@ -268,9 +284,17 @@ def getpost(post_id):
 		return "Unknown Post<br>" + str(e)
 
 
+def getposts(user):
+	posts = Posts.query.all()
+	return posts
+
+
 @app.route('/')
 def mainpage():
-	temp = Posts.query.all()
+	myuser = getuserfromtoken(request.cookies.get('token'))
+	if myuser == None:
+		myuser = {}
+	temp = getposts(myuser)
 	posts = []
 	creates = []
 	for post in temp:
@@ -287,9 +311,6 @@ def mainpage():
 		posts.append(pst)
 		create = Users.query.filter_by(public_id=post.creator).first()
 		creates.append(create)
-	myuser = getuserfromtoken(request.cookies.get('token'))
-	if myuser == None:
-		myuser = {}
 	likes = []
 	if myuser != {}:
 		if str(myuser.likedposts) != None:
@@ -372,7 +393,8 @@ def login():
 			token = jwt.encode(
 			 {
 			  'public_id': user.public_id,
-			  'exp': datetime.utcnow() + timedelta(minutes=240)
+			  'exp': datetime.utcnow() + timedelta(minutes=240),
+			  'ip': str(request.remote_addr)
 			 }, app.config['SECRET_KEY'], 'HS256')
 			ret = make_response(
 			 jsonify({
@@ -387,7 +409,7 @@ def login():
 		return render_template('newlogin.html', error=error, log="login")
 
 
-@app.route('/admin')
+@app.route('/admins')
 @token_required
 def admin(user):
 	if not user or user.admin == False:
@@ -491,12 +513,11 @@ def showuser(user):
 	if userlist.posts != "" and userlist.posts != None:
 		for post in str(userlist.posts).split(','):
 			posts.append(Posts.query.filter_by(pub_id=post).first())
-	if myuser != None:
+	if myuser != None and myuser.following != None and myuser.blocked != None and userlist != None:
 		if userlist.public_id in myuser.following:
 			following = True
 		if userlist.public_id in myuser.blocked:
 			blocked = True
-
 		if myuser.public_id in userlist.following:
 			followed = True
 		if myuser.public_id in userlist.blocked:
@@ -558,7 +579,6 @@ def getpostcontent(user):
 	if not post:
 		return jsonify({"error": True, "post": "post not found"})
 	return jsonify({"error": False, "post": post.content})
-
 
 @app.route('/api/editpost', methods=['POST'])
 @token_required

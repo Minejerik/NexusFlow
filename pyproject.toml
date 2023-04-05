@@ -12,6 +12,7 @@ Werkzeug = "^2.2.3"
 Flask = "^2.2.3"
 Flask-SQLAlchemy = "^3.0.3"
 Flask-Htmldoom = "^0.2.1"
+Flask-Admin = "^1.6.1"
 
 [tool.poetry.dev-dependencies]
 

@@ -18,7 +18,8 @@
         }
                 
         .posts-content{
-            margin-top:20px;    
+            margin-top:20px;
+						width: 2000px;
         }
         .ui-w-40 {
             width: 40px !important;
@@ -75,16 +76,22 @@
 					border: none;
 					border-radius:5px;
 					background-color:blue;
+					color: white;
 				}
 
 				#blockbutton{
 					border: none;
 					border-radius:5px;
 					background-color:red;
+					color: white;
 				}
                 
     </style>
     <script>
+			var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-			toggle="tooltip"]'))
+				var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+ 				 return new bootstrap.Tooltip(tooltipTriggerEl)
+				})
         async function send(id) {
           const error = document.getElementById("error");
           const resp = await fetch("/api/like", {
@@ -193,6 +200,17 @@
 				
 </script>
 </head>
+	
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-6CNJ5360HZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-6CNJ5360HZ');
+</script>
+
 <body>
 {% set user = myuser %}
 {% include "header.html" %}
@@ -201,11 +219,14 @@
             <div class="col-md-3">
                 <div class="card">
                     <div class="card-body text-center">
-                        <img src="{{taruser.pfpurl}}" alt="Profile Picture" class="rounded-circle mb-3" width="150px">
+                        <img src="{{taruser.pfpurl}}" alt="Profile Picture" class="rounded-circle mb-3" width="150px" height="150px">
                         <h4>{{taruser.name}}</h4>
+											{% if taruser.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}<br>
 											<small>
-												Following: {{taruser.followingcount}}
-												Followers: {{taruser.followercount}}<br>
+												<div data-bs-toggle="tooltip" data-bs-placement="top" title="Tooltip on top">
+												Following: {{ taruser.followingcount | format }}
+												</div>
+												Followers: {{ taruser.followercount | format }}<br>
 											</small>
 												{% if taruser.name == myuser.name %}
 											
@@ -232,7 +253,7 @@
                                       <div class="card-body">
                                         <div class="media mb-3">
                                           <div class="d-flex align-items-center">
-                                            <img src="{{taruser['pfpurl']}}" class="d-block ui-w-40 rounded-circle" alt=""> &nbsp;&nbsp;
+                                            <img src="{{taruser['pfpurl']}}" class="rounded-circle" alt="" width="50px" height="50px"> &nbsp;&nbsp;
                                             <div class="media-body ml-3">
                                               <a href="/u/{{taruser['name']}}">{{taruser['name']}}{% if taruser.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}
                                             </div>&nbsp;&nbsp;&nbsp;&nbsp;

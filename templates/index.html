@@ -72,6 +72,17 @@ a {
 		
 	</style>
 </head>
+	
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-6CNJ5360HZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-6CNJ5360HZ');
+</script>
+
 <body>
 <script>
         async function send(id) {
@@ -185,7 +196,7 @@ a {
               <div class="card-body">
                 <div class="media mb-3">
                   <div class="d-flex align-items-center">
-                    <img src="{{create['pfpurl']}}" class="d-block ui-w-40 rounded-circle" alt=""> &nbsp;&nbsp;
+                    <img src="{{create['pfpurl']}}" class="rounded-circle" alt="" width="40px" height="40px"> &nbsp;&nbsp;
                     <div class="media-body ml-3">
                       <a href="/u/{{create['name']}}">{{create['name']}}{% if create.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}
                     </div>&nbsp;&nbsp;&nbsp;&nbsp;
@@ -223,6 +234,8 @@ a {
 {% endif %}
 {% endfor %}
 
+{% if posts == [] %}
 <h1 style="padding-left:150px;">No More Posts Found</h1>
+{% endif %}
 </body>
 </html>

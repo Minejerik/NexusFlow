@@ -196,6 +196,17 @@
     }
 </script>
 </head>
+	
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-6CNJ5360HZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-6CNJ5360HZ');
+</script>
+
 <body>
     {% set user = myuser %}
 {% include "header.html" %}
@@ -206,7 +217,7 @@
                   <div class="card-body">
                     <div class="media mb-3">
                       <div class="d-flex align-items-center">
-                        <img src="{{create['pfpurl']}}" class="d-block ui-w-40 rounded-circle" alt=""> &nbsp;&nbsp;
+                        <img src="{{create['pfpurl']}}" class="rounded-circle" alt="" width="50px" height="50px"> &nbsp;&nbsp;
                         <div class="media-body ml-3">
                           <a href="/u/{{create['name']}}">{{create['name']}}{% if create.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}
                         </div>&nbsp;&nbsp;&nbsp;&nbsp;
@@ -224,13 +235,13 @@
                     <a href="javascript:send('{{post['pub_id']}}')" class="d-inline-block text-muted">
                         
                       {% if post['pub_id'] in likes %}
-                      <strong>{{post['likes']}}</strong> Liked
+                      <strong>{{post['likes'] | format}}</strong> Liked
                   {% else %}
-                      <strong>{{post['likes']}}</strong> Likes
+                      <strong>{{post['likes'] | format}}</strong> Likes
                   {% endif %}
                     </a>
                     <a href="/p/{{post['pub_id']}}" class="d-inline-block text-muted ml-3">
-                        <strong>{{post['comments']}}</strong> Comments
+                        <strong>{{post['comments'] | format}}</strong> Comments
                     </a>
                     &nbsp;&nbsp;
                     {% if post['edited'] == True %}

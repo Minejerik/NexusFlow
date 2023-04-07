@@ -223,14 +223,17 @@
                         <h4>{{taruser.name}}</h4>
 											{% if taruser.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}<br>
 											<small>
-												<div data-bs-toggle="tooltip" data-bs-placement="top" title="Tooltip on top">
+												<div data-bs-toggle="tooltip" data-bs-placement="top" title="{{"{:,}".format(taruser.followingcount)}}">
 												Following: {{ taruser.followingcount | format }}
 												</div>
+												<div data-bs-toggle="tooltip" data-bs-placement="top" title="{{"{:,}".format(taruser.followercount)}}">
 												Followers: {{ taruser.followercount | format }}<br>
+												</div>
 											</small>
 												{% if taruser.name == myuser.name %}
 											
-													<button id="followbutton" onclick="follow('{{taruser.public_id}}')">Follow</button> <button id="blockbutton" onclick="block('{{taruser.public_id}}')">Block</button>
+													<button onclick="follow('{{taruser.public_id}}')" type="button" class="btn btn-primary">Follow</button> 
+														<button type="button" class="btn btn-danger"onclick="block('{{taruser.public_id}}')">Block</button>
 												{% endif %}
                         <hr>
                         <p class="text-muted">{{taruser.bio|markdown}}</p>

@@ -5,14 +5,120 @@
             window.location.href = "/";
 
         }
+  const copyContent = async (text) => {
+		navigator.permissions.query({ name: "write-on-clipboard" }).then((result) => {
+  		if (result.state == "granted" || result.state == "prompt") {
+				try{
+    			await navigator.clipboard.writeText(text);
+	     		console.log('Content copied to clipboard');
+    		} catch (err) {
+      		console.error('Failed to copy: ', err);
+    	}
+		});
+
+  }
     </script>
+{% if myuser != {} %}
+<script>
+        async function send(id) {
+          const error = document.getElementById("error");
+          const resp = await fetch("/api/like", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          });
+          const text = await resp.text();
+					const obj = JSON.parse(text)
+					if (obj.error == false){
+						location.reload()
+					}
+				}
+	      async function del(id) {
+          const resp = await fetch("/api/deletepost", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          });
+          const text = await resp.text();
+					const obj = JSON.parse(text)
+					if (obj.error == false){
+						location.reload()
+					} else {
+						document.write(obj.error)
+					}
+				}
+        async function edit(id) {
+          const content = document.getElementById("content"+id);
+          while (content.firstChild) {
+            content.removeChild(content.firstChild);
+          }
+          const input = document.createElement("textarea");
+          const resp = fetch("/api/getpost", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          })
+            .then((response) => response.json())
+            .then((json) => {
+              input.value = json.post; // set current value of the textarea
+            });
+          input.setAttribute("id", "content-text"+id);
+          input.setAttribute("class", "form-control");
+          const button = document.createElement("button");
+          button.setAttribute("class", "btn btn-primary");
+          button.setAttribute("onclick", "editpost('" + id + "')");
+          button.innerHTML = "Submit";
+          content.appendChild(input);
+          content.appendChild(button);
+        }
+
+        async function editpost(id) {
+          const content = document.getElementById("content-text"+id).value;
+          const resp = await fetch("/api/editpost", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id) +
+              "&content=" +
+              encodeURIComponent(content),
+          });
+          const text = await resp.text();
+          const obj = JSON.parse(text);
+          if (obj.error == false) {
+            location.reload();
+          } else {
+            document.write(obj.error);
+          }
+        }
+
+	      document.addEventListener("DOMContentLoaded", function(event) { 
+            var scrollpos = localStorage.getItem('scrollpos');
+            if (scrollpos) window.scrollTo(0, scrollpos);
+        });
+
+        window.onbeforeunload = function(e) {
+            localStorage.setItem('scrollpos', window.scrollY);
+        };
+</script>
+{% endif %}
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">NexusFlow</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNavDropdown">
                 <ul class="navbar-nav">
                     {% if user != {} %}
                     <li class="nav-item">
@@ -21,7 +127,7 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/u/{{user.name}}">Profile</a>
                     </li>
-                    <li class="nav-item dropdown">
+                    <li class="nav-item dropdown d-flex me-2">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <img src="{{user.pfpurl}}" alt="" width="24" height="24" class="d-inline-block align-text-top profile-image">
                             {{user.name}}
@@ -40,6 +146,5 @@
                     </li>
                     {% endif %}
                 </ul>
-            </div>
         </div>
     </nav>

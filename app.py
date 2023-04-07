@@ -114,6 +114,11 @@ class Posts(db.Model):
 	isreply = db.Column(db.Boolean)
 	edited = db.Column(db.Boolean)
 
+class links(db.Model):
+	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+	link = db.Column(db.String(30))
+	linkto = db.Column(db.String())
+
 
 with app.app_context():
 	db.create_all()
@@ -121,12 +126,21 @@ with app.app_context():
 admin = Admin(app, name='NexusFlow', template_mode='bootstrap3')
 admin.add_view(ModelView(Users, db.session))
 admin.add_view(ModelView(Posts, db.session))
+admin.add_view(ModelView(links, db.session))
 
 
 @app.route('/assets/<path:path>')
 def send_assets(path):
 	try:
 		return send_file("static/assets/" + path)
+	except:
+		return "Not Found", 404
+
+@app.route('/l/<path:path>')
+def getlink(path):
+	try:
+		gotlink = links.query.filter_by(link=path).first()
+		return redirect(gotlink.linkto)
 	except:
 		return "Not Found", 404
 
@@ -163,7 +177,7 @@ def token_required(f):
 			return jsonify({'message': 'a valid token is missing'})
 		try:
 			data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-			if data['ip'] != request.remote_addr:
+			if data['ip'] != request.environ['REMOTE_ADDR']:
 				return redirect('/login'), 401
 			current_user = Users.query.filter_by(public_id=data['public_id']).first()
 		except Exception as e:
@@ -271,8 +285,8 @@ def getpost(post_id):
 				if h == None:
 					continue
 				h = h.__dict__
-				create = Users.query.filter_by(public_id=h['creator']).first()
-				subcreate.append(create)
+				creates = Users.query.filter_by(public_id=h['creator']).first()
+				subcreate.append(creates)
 		return render_template('postview.html',
 		                       post=post,
 		                       create=create,
@@ -394,7 +408,7 @@ def login():
 			 {
 			  'public_id': user.public_id,
 			  'exp': datetime.utcnow() + timedelta(minutes=240),
-			  'ip': str(request.remote_addr)
+			  'ip': str(request.environ['REMOTE_ADDR'])
 			 }, app.config['SECRET_KEY'], 'HS256')
 			ret = make_response(
 			 jsonify({

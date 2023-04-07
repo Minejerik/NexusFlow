@@ -22,7 +22,7 @@
         }
 
         #reply{
-          width: 50%;
+          width: 40%;
         }
         .ui-w-40 {
             width: 40px !important;
@@ -73,8 +73,16 @@
         .default-style .ui-bordered {
             border: 1px solid rgba(24,28,33,0.06);
         }
-                
+
+				#reply{
+					margin-left:125px;
+				}
+
+				#replytxt{
+					width: 40%;
+				}
     </style>
+{% if myuser != {} %}
     <script>
         async function send(id) {
           const error = document.getElementById("error");
@@ -195,6 +203,7 @@
         }
     }
 </script>
+{% endif %}
 </head>
 	
 <!-- Google tag (gtag.js) -->
@@ -229,7 +238,6 @@
                                         {{post['content']|markdown}}
                     </p>
                     </div>
-    <!--                 <a href="javascript:void(0)" class="ui-rect ui-bg-cover" style="background-image: url('https://bootdey.com/img/Content/avatar/avatar3.png');"></a> -->
                   </div>
                   <div class="card-footer">
                     <a href="javascript:send('{{post['pub_id']}}')" class="d-inline-block text-muted">
@@ -252,9 +260,10 @@
             </div>
     </div>
     </div>
-
-<textarea class="form-control" id="comment{{post['pub_id']}}" rows="3" placeholder="Add a comment..."></textarea><button class="btn btn-primary" onclick="comment()">Comment</button>
+{% if myuser != {} %}
+<textarea class="form-control" id="comment{{post['pub_id']}}" rows="3" placeholder="Add a comment..." id="replytxt"></textarea><button class="btn btn-primary" onclick="comment()">Comment</button>
 <br>
+{% endif %}
 {% for i in range(sub|length) %}
 {% set subpost = sub[i] %}
 {% set subcreate = subcreate[i] %}
@@ -266,7 +275,7 @@
         </div>
         <div class="col">
           <p class="card-text">{{ subpost.content }}</p>
-          <p class="card-text"><small class="text-muted"><a href="/u/{{create['name']}}">{{create['name']}}{% if create.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}</small></p>
+          <div class="card-text"><small class="text-muted"><a href="/u/{{create['name']}}">{{subcreate['name']}}{% if subcreate.admin == True %} </a> <div id="admin">Admin</div> {% else%} </a> {% endif %}</small></div>
         </div>
       </div>
     </div>

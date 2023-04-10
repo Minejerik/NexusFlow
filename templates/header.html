@@ -5,19 +5,34 @@
             window.location.href = "/";
 
         }
-  const copyContent = async (text) => {
-		navigator.permissions.query({ name: "write-on-clipboard" }).then((result) => {
+  function copy(text) {
+		navigator.permissions.query({ name: "clipboard-write" }).then((result) => {
   		if (result.state == "granted" || result.state == "prompt") {
 				try{
-    			await navigator.clipboard.writeText(text);
+    			navigator.clipboard.writeText(text);
 	     		console.log('Content copied to clipboard');
     		} catch (err) {
       		console.error('Failed to copy: ', err);
     	}
-		});
-
+		}});
   }
-    </script>
+
+  async function getpostlink(id) {
+    const error = document.getElementById("error");
+          const resp = await fetch("/api/getshort", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          });
+          const text = await resp.text();
+					const obj = JSON.parse(text)
+					alert("{{domain}}l/" + obj.link)
+  }
+</script>
 {% if myuser != {} %}
 <script>
         async function send(id) {

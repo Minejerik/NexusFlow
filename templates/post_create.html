@@ -28,14 +28,7 @@
             const cont = document.getElementById('body').value
 
             let j = {}
-
-            const resp = await fetch('/api/getid', {
-                method: "GET"
-            })
-            const temp = await resp.text()
-            const test = JSON.parse(temp)
             j.content = cont
-            j.creator = test.userid
             j.parentpost = null
             j.subpost = null
 
@@ -49,7 +42,6 @@
             })
             const resptxt = await resp2.text()
 			const tempa = JSON.parse(resptxt)
-            window.location.href = "/"
         }
     </script>
     {% set user = myuser %}

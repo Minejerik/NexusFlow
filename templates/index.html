@@ -9,67 +9,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js" ></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.min.js" integrity="sha384-Atwg2Pkwv9vp0ygtn1JAojH0nYbwNJLPhwyoVbhoPwBhjQPR5VtM2+xf0Uwh9KtT" crossorigin="anonymous"></script>
 	<style>
-body {
-    background:#eee;
-}
 
 a {
   color: inherit;
 }
-		
-.posts-content{
-    margin-top:20px;    
-}
-.ui-w-40 {
-    width: 40px !important;
-    height: auto;
-}
-.default-style .ui-bordered {
-    border: 1px solid rgba(24,28,33,0.06);
-}
-.ui-bg-cover {
-    background-color: transparent;
-    background-position: center center;
-    background-size: cover;
-}
-.ui-rect {
-    padding-top: 50% !important;
-}
-.ui-rect, .ui-rect-30, .ui-rect-60, .ui-rect-67, .ui-rect-75 {
-    position: relative !important;
-    display: block !important;
-    padding-top: 100% !important;
-    width: 100% !important;
-}
-.d-flex, .d-inline-flex, .media, .media>:not(.media-body), .jumbotron, .card {
-    -ms-flex-negative: 1;
-    flex-shrink: 1;
-}
 
-#admin{
-  background-color: lightgreen;
-  border-radius: 5px;
-  display: inline;
-  padding: 3px;
-}
-
-.bg-dark {
-    background-color: rgba(24,28,33,0.9) !important;
-}
-.card-footer, .card hr {
-    border-color: rgba(24,28,33,0.06);
-}
-.ui-rect-content {
-    position: absolute !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    left: 0 !important;
-}
-.default-style .ui-bordered {
-    border: 1px solid rgba(24,28,33,0.06);
-}
-		
 	</style>
 </head>
 	
@@ -103,19 +47,20 @@ a {
                     <div class="media-body ml-3">
                       <a href="/u/{{create['name']}}">{{create['name']}}{% if create.admin == True %} </a> <span class="badge bg-success rounded-pill">Admin</span> {% else%} </a> {% endif %}
                     </div>&nbsp;&nbsp;&nbsp;&nbsp;
-                    <div class="text-muted small">{{post['date_created']}} &nbsp;&nbsp; {% if create['public_id'] == myuser['public_id'] and  post['del_allow'] == True or myuser['admin'] ==True %}
+                    <div class="text-muted small">{{post['date_created']}} &nbsp;&nbsp; 
 <div class="btn-group">
   <button type="button" class="btn btn-link dropdown-toggle btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
     Info
   </button>
   <ul class="dropdown-menu">
+    {% if create['public_id'] == myuser['public_id'] and  post['del_allow'] == True or myuser['admin'] ==True %}
     <li><a class="dropdown-item" href="javascript:edit('{{post['pub_id']}}')">Edit Post</a></li>
     <li><a class="dropdown-item" href="javascript:del('{{post['pub_id']}}')">Delete Post</a></li>
     <li><hr class="dropdown-divider"></li>
+    {% endif %}
     <li><a class="dropdown-item" href="javascript:getpostlink('{{post.pub_id}}')">Copy Link</a></li>
   </ul>
 </div>
-{% endif %}
 </div>
                   </div>
                 </div>

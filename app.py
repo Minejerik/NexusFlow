@@ -64,10 +64,11 @@ def checkinject(input_string, user):
 		delable = False
 	return input_string, delable
 
+domain = "http://10.5.0.2:81/"
 
 @app.context_processor
 def inject_now():
-	return {'now': datetime.utcnow()}
+	return {'now': datetime.utcnow(), 'domain':domain}
 
 @app.template_filter('format')
 def format(num):
@@ -98,6 +99,7 @@ class Users(db.Model, Serializer):
 	following = db.Column(db.String(), default="")
 	blocked = db.Column(db.String(), default="")
 	posts = db.Column(db.String(), default="")
+	algmod = db.Column(db.Integer, default=0)
 	admin = db.Column(db.Boolean)
 
 class Posts(db.Model):
@@ -144,28 +146,41 @@ def getlink(path):
 	except:
 		return "Not Found", 404
 
+@app.route('/api/getshort', methods=['POST'])
+def getshort():
+	temp = links.query.filter_by(linkto='/p/'+request.form['id']).first()
+	if temp is not None:
+		return jsonify({'link': temp.link})
+	info = request.form
+	link = "/p/"+info['id']
+	newlink = links(link=str(uuid.uuid4())[:6], linkto=link)
+	db.session.add(newlink)
+	db.session.commit()
+	print(newlink.link)
+	return jsonify({'link': newlink.link})
 
-@app.route('/register', methods=['POST', 'GET'])
+@app.route('/register')
 def signup_user():
-	if request.method == 'GET':
-		return render_template('newlogin.html', log="register")
-	else:
-		data = request.form
-		userlist = Users.query.filter_by(name=data['name']).first()
-		if userlist is not None:
-			print("User already exists!")
-			return jsonify({'error': 'User already exists!'})
-		hashed_password = generate_password_hash(data['password'], method='sha256')
-		new_user = Users(public_id=str(uuid.uuid4()),
-		                 name=data['name'],
-		                 badges=0,
-		                 bio="",
-		                 password=hashed_password,
-		                 pfpurl="/assets/newuser.png",
-		                 admin=False)
-		db.session.add(new_user)
-		db.session.commit()
-		return jsonify({'error': False, 'redirect': '/login'})
+	return render_template('register.html')
+
+@app.route('/api/register', methods=['POST'])
+def register():
+	data = request.form
+	userlist = Users.query.filter_by(name=data['name']).first()
+	if userlist is not None:
+		print("User already exists!")
+		return jsonify({'error': 'User already exists!'})
+	hashed_password = generate_password_hash(data['password'], method='sha256')
+	new_user = Users(public_id=str(uuid.uuid4()),
+						name=data['name'],
+						bio="",
+						password=hashed_password,
+						pfpurl="/assets/newuser.png",
+						algmod=0,
+						admin=False)
+	db.session.add(new_user)
+	db.session.commit()
+	return jsonify({'error': False, 'redirect': '/login'})
 
 
 def token_required(f):
@@ -209,7 +224,7 @@ def createpost(user):
 		content, delable = checkinject(content, user)
 		new_post = Posts(pub_id=str(uuid.uuid4()),
 		                 content=content,
-		                 creator=test['creator'],
+		                 creator=user.public_id,
 		                 parentpost=test['parentpost'],
 		                 isreply=False,
 		                 subpost=test['subpost'],
@@ -228,6 +243,12 @@ def createpost(user):
 		db.session.commit()
 	print(user.posts)
 	return jsonify({"error": False, "id": new_post.pub_id})
+
+# @app.route('/temp')
+# def test():
+# 	us = getuserfromtoken(request.cookies.get('token'))
+# 	post = Posts.query.filter_by(pub_id="3f29902d-a922-45ea-9226-3946ccbc25f3").first()
+# 	return render_template('newpost.html', create=us, myuser=us, post=post)
 
 
 @app.route('/api/createreply', methods=['POST'])
@@ -395,32 +416,32 @@ def likepost(user):
 
 
 # Route for handling the login page logic
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login')
 def login():
-	error = None
-	if request.method == 'POST':
-		auth = request.form
-		user = Users.query.filter_by(name=auth['name']).first()
-		if not user:
-			return jsonify({"error": "User does not exist"})
-		if check_password_hash(user.password, auth['password']):
-			token = jwt.encode(
-			 {
-			  'public_id': user.public_id,
-			  'exp': datetime.utcnow() + timedelta(minutes=240),
-			  'ip': str(request.environ['REMOTE_ADDR'])
-			 }, app.config['SECRET_KEY'], 'HS256')
-			ret = make_response(
-			 jsonify({
-			  "error": False,
-			  "token": token,
-			  "redirect": "/"
-			 }))
-			ret.set_cookie('token', token)
-			return ret
-		return jsonify({"error": "Incorrect Username or Password"})
-	else:
-		return render_template('newlogin.html', error=error, log="login")
+	return render_template('login.html')
+
+@app.route('/api/login', methods=['POST'])
+def loginapi():
+	auth = request.form
+	user = Users.query.filter_by(name=auth['name']).first()
+	if not user:
+		return jsonify({"error": "User does not exist"})
+	if check_password_hash(user.password, auth['password']):
+		token = jwt.encode(
+			{
+			'public_id': user.public_id,
+			'exp': datetime.utcnow() + timedelta(minutes=240),
+			'ip': str(request.environ['REMOTE_ADDR'])
+			}, app.config['SECRET_KEY'], 'HS256')
+		ret = make_response(
+			jsonify({
+			"error": False,
+			"token": token,
+			"redirect": "/"
+			}))
+		ret.set_cookie('token', token)
+		return ret
+	return jsonify({"error": "Incorrect Username or Password"})
 
 
 @app.route('/admins')

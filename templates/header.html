@@ -5,17 +5,6 @@
             window.location.href = "/";
 
         }
-  function copy(text) {
-		navigator.permissions.query({ name: "clipboard-write" }).then((result) => {
-  		if (result.state == "granted" || result.state == "prompt") {
-				try{
-    			navigator.clipboard.writeText(text);
-	     		console.log('Content copied to clipboard');
-    		} catch (err) {
-      		console.error('Failed to copy: ', err);
-    	}
-		}});
-  }
 
   async function getpostlink(id) {
     const error = document.getElementById("error");
@@ -68,6 +57,42 @@
 						location.reload()
 					} else {
 						document.write(obj.error)
+					}
+				}
+	      async function follow(id) {
+          const resp = await fetch("/api/follow", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          });
+          const text = await resp.text();
+					const obj = JSON.parse(text)
+					if (obj.error == false){
+						location.reload()
+					} else {
+						alert(obj.error)
+					}
+				}
+	      async function block(id) {
+          const resp = await fetch("/api/block", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body:
+              "id=" +
+              encodeURIComponent(id),
+          });
+          const text = await resp.text();
+					const obj = JSON.parse(text)
+					if (obj.error == false){
+						location.reload()
+					} else {
+						alert(obj.error)
 					}
 				}
         async function edit(id) {
@@ -131,6 +156,12 @@
         };
 </script>
 {% endif %}
+<style>
+	body{
+		overflow-x:hidden;
+		background:#eee;
+	}
+</style>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="/">NexusFlow</a>
@@ -148,8 +179,10 @@
                             {{user.name}}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+													<li><a class="dropdown-item" href="/settings">Settings</a></li>
+													<div class="dropdown-divider"></div>
                             <li><a class="dropdown-item" href="javascript:logout()">Logout</a></li>
-                            <li><a class="dropdown-item" href="/settings">Settings</a></li>
+                            
                         </ul>
                     </li>
                     {% else %}

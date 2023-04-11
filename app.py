@@ -1,10 +1,9 @@
-from flask import Flask, jsonify, make_response, request, redirect, render_template, url_for, send_file, flash
-import sys
+from flask import Flask, jsonify, make_response, request, redirect, render_template, send_file
+from random import randint
 import re
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
-from werkzeug.utils import secure_filename
 from flask_admin.contrib.sqla import ModelView
 from flask_admin import Admin
 import uuid
@@ -21,7 +20,7 @@ app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
+app.config['FLASK_ADMIN_SWATCH'] = 'slate'
 md = Markdown(
  app,
  extensions=['footnotes'],
@@ -64,7 +63,7 @@ def checkinject(input_string, user):
 		delable = False
 	return input_string, delable
 
-domain = "http://10.5.0.2:81/"
+domain = "https://nexusflow.minejerik.repl.co/"
 
 @app.context_processor
 def inject_now():
@@ -88,7 +87,9 @@ class Serializer(object):
 class Users(db.Model, Serializer):
 	id = db.Column(db.Integer, primary_key=True)
 	public_id = db.Column(db.String())
-	bio = db.Column(db.String(150))
+	ip = db.Column(db.String(), default="")
+	email = db.Column(db.String(), default="")
+	bio = db.Column(db.String(150), default="")
 	name = db.Column(db.String(50))
 	password = db.Column(db.String(500))
 	pfpurl = db.Column(db.String(150))
@@ -100,7 +101,8 @@ class Users(db.Model, Serializer):
 	blocked = db.Column(db.String(), default="")
 	posts = db.Column(db.String(), default="")
 	algmod = db.Column(db.Integer, default=0)
-	admin = db.Column(db.Boolean)
+	postallow = db.Column(db.Boolean, default=False) 
+	admin = db.Column(db.Boolean, default=False)
 
 class Posts(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -177,6 +179,7 @@ def register():
 						password=hashed_password,
 						pfpurl="/assets/newuser.png",
 						algmod=0,
+						postallow = True,
 						admin=False)
 	db.session.add(new_user)
 	db.session.commit()
@@ -219,6 +222,8 @@ def getuserfromtoken(token):
 def createpost(user):
 	test = request.get_json()
 	delable = True
+	if user.postallow == False:
+		return jsonify({'error':"banned"})
 	try:
 		content = test['content']
 		content, delable = checkinject(content, user)
@@ -241,14 +246,8 @@ def createpost(user):
 	else:
 		user.posts = str(user.posts) + ',' + str(new_post.pub_id)
 		db.session.commit()
-	print(user.posts)
 	return jsonify({"error": False, "id": new_post.pub_id})
 
-# @app.route('/temp')
-# def test():
-# 	us = getuserfromtoken(request.cookies.get('token'))
-# 	post = Posts.query.filter_by(pub_id="3f29902d-a922-45ea-9226-3946ccbc25f3").first()
-# 	return render_template('newpost.html', create=us, myuser=us, post=post)
 
 
 @app.route('/api/createreply', methods=['POST'])
@@ -256,6 +255,8 @@ def createpost(user):
 def createreply(user):
 	test = request.get_json()
 	delable = True
+	if user.postallow == False:
+		return jsonify({'error':"banned"})
 	try:
 		temp = test['id']
 		parent = Posts.query.filter_by(pub_id=temp).first()
@@ -321,6 +322,11 @@ def getpost(post_id):
 
 def getposts(user):
 	posts = Posts.query.all()
+	if user != {}:
+		for post in posts:
+			print(post.content)
+			if post.creator in user.blocked or ","+post.creator in user.blocked or ","+post.creator+"," in user.blocked:
+				posts.remove(post)
 	return posts
 
 
@@ -331,6 +337,7 @@ def mainpage():
 		myuser = {}
 	temp = getposts(myuser)
 	posts = []
+	used = []
 	creates = []
 	for post in temp:
 		matches = re.findall(r'u\/(\S+)', post.content)
@@ -340,9 +347,11 @@ def mainpage():
 				cont = post.content
 
 				user = Users.query.filter_by(name=us).first()
-				if user != None and us in cont:
+				if user != None and us in cont and us not in used:
 					cont = cont.replace('u/' + us, f'<a href="/u/{us}">u/{us}</a>')
 					pst['content'] = cont
+					used.append(us)
+					
 		posts.append(pst)
 		create = Users.query.filter_by(public_id=post.creator).first()
 		creates.append(create)
@@ -491,6 +500,49 @@ def setuser(user):
 	except Exception as e:
 		return jsonify({"error": str(e)})
 
+def getuserfromid(id):
+	user = Users.query.filter_by(public_id=id).first()
+	if user:
+		return user
+	else:
+		return {}
+
+@app.route("/api/follow", methods=["POST"])
+@token_required
+def followuser(user):
+	test = request.form
+	tof = test['id']
+	tof = getuserfromid(tof)
+	if tof.public_id in user.blocked:
+		return jsonify({"error":"User Blocked"})
+	if tof.public_id not in user.following:
+		tof.followers += ","+user.public_id
+		tof.followercount += 1
+		user.following += ","+tof.public_id
+		user.followingcount += 1
+	else:
+		tof.followers = tof.followers.replace(","+user.public_id,"")
+		tof.followercount -= 1
+		user.following = user.following.replace(","+tof.public_id,"")
+		user.followingcount -= 1
+	db.session.commit()
+	return jsonify({"error":False})
+
+
+@app.route("/api/block", methods=["POST"])
+@token_required
+def blockuser(user):
+	test = request.form
+	tof = test['id']
+	tof = getuserfromid(tof)
+	if tof.public_id in user.following:
+		return jsonify({"error":"Following User"})
+	if tof.public_id not in user.blocked:
+		user.blocked += ","+tof.public_id
+	else:
+		user.blocked = user.blocked.replace(","+tof.public_id,"")
+	db.session.commit()
+	return jsonify({"error":False})
 
 @app.route('/api/deleteuser', methods=['POST'])
 @token_required
@@ -502,7 +554,12 @@ def deleteuser(user):
 		return jsonify({"error": True}), 400
 	try:
 		user = Users.query.filter_by(public_id=test['id']).first()
-		db.session.delete(user)
+		user.password = "jhalksdjghhzbxkvjchgiuoahekjlsadhdfuiohasdfmnkjasdfd"
+		user.bio = "This user has been deleted!"
+		user.name = "Deleted User "+str(randint(0,99999999))
+		user.pfpurl = "/assets/newuser.png"
+		user.admin = False
+		user.postallow = False
 		db.session.commit()
 		return jsonify({"error": False})
 	except Exception as e:
@@ -580,7 +637,9 @@ def setsettings(user):
 		if userlist and user.name != test['name']:
 			return jsonify({"error": "Username already taken"})
 		user.name = test['name']
-		user.bio = test['bio']
+		temp, allow = checkinject(test['bio'], user)
+		if allow == True:
+			user.bio = test['bio']
 		if test['password'] != None and test['password'] != '':
 			temp = generate_password_hash(test['password'], method='sha256')
 			if temp == user.password:

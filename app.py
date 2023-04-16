@@ -16,11 +16,15 @@ UPLOAD_FOLDER = '/static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app = Flask(__name__)
+
 app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['FLASK_ADMIN_SWATCH'] = 'slate'
+app.jinja_env.trim_blocks = True
+app.jinja_env.lstrip_blocks = True
+
 md = Markdown(
  app,
  extensions=['footnotes'],
@@ -32,13 +36,16 @@ def allowed_file(filename):
 	return '.' in filename and \
         filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 def human_format(num):
-    num = float('{:.3g}'.format(num))
-    magnitude = 0
-    while abs(num) >= 1000:
-        magnitude += 1
-        num /= 1000.0
-    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'K', 'M', 'B', 'T'][magnitude])
+	num = float('{:.3g}'.format(num))
+	magnitude = 0
+	while abs(num) >= 1000:
+		magnitude += 1
+		num /= 1000.0
+	return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'),
+	                     ['', 'K', 'M', 'B', 'T'][magnitude])
+
 
 def contains_sql_statement(input_string):
 	sql_pattern = re.compile(r'\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|DROP)\b',
@@ -63,11 +70,14 @@ def checkinject(input_string, user):
 		delable = False
 	return input_string, delable
 
+
 domain = "https://nexusflow.minejerik.repl.co/"
+
 
 @app.context_processor
 def inject_now():
-	return {'now': datetime.utcnow(), 'domain':domain}
+	return {'now': datetime.utcnow(), 'domain': domain}
+
 
 @app.template_filter('format')
 def format(num):
@@ -101,8 +111,9 @@ class Users(db.Model, Serializer):
 	blocked = db.Column(db.String(), default="")
 	posts = db.Column(db.String(), default="")
 	algmod = db.Column(db.Integer, default=0)
-	postallow = db.Column(db.Boolean, default=False) 
+	postallow = db.Column(db.Boolean, default=False)
 	admin = db.Column(db.Boolean, default=False)
+
 
 class Posts(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -117,6 +128,7 @@ class Posts(db.Model):
 	del_allow = db.Column(db.Boolean)
 	isreply = db.Column(db.Boolean)
 	edited = db.Column(db.Boolean)
+
 
 class links(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -140,6 +152,7 @@ def send_assets(path):
 	except:
 		return "Not Found", 404
 
+
 @app.route('/l/<path:path>')
 def getlink(path):
 	try:
@@ -148,22 +161,25 @@ def getlink(path):
 	except:
 		return "Not Found", 404
 
+
 @app.route('/api/getshort', methods=['POST'])
 def getshort():
-	temp = links.query.filter_by(linkto='/p/'+request.form['id']).first()
+	temp = links.query.filter_by(linkto='/p/' + request.form['id']).first()
 	if temp is not None:
 		return jsonify({'link': temp.link})
 	info = request.form
-	link = "/p/"+info['id']
+	link = "/p/" + info['id']
 	newlink = links(link=str(uuid.uuid4())[:6], linkto=link)
 	db.session.add(newlink)
 	db.session.commit()
 	print(newlink.link)
 	return jsonify({'link': newlink.link})
 
+
 @app.route('/register')
 def signup_user():
 	return render_template('register.html')
+
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -174,13 +190,13 @@ def register():
 		return jsonify({'error': 'User already exists!'})
 	hashed_password = generate_password_hash(data['password'], method='sha256')
 	new_user = Users(public_id=str(uuid.uuid4()),
-						name=data['name'],
-						bio="",
-						password=hashed_password,
-						pfpurl="/assets/newuser.png",
-						algmod=0,
-						postallow = True,
-						admin=False)
+	                 name=data['name'],
+	                 bio="",
+	                 password=hashed_password,
+	                 pfpurl="/assets/newuser.png",
+	                 algmod=0,
+	                 postallow=True,
+	                 admin=False)
 	db.session.add(new_user)
 	db.session.commit()
 	return jsonify({'error': False, 'redirect': '/login'})
@@ -195,8 +211,10 @@ def token_required(f):
 			return jsonify({'message': 'a valid token is missing'})
 		try:
 			data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-			if data['ip'] != request.environ['REMOTE_ADDR']:
-				return redirect('/login'), 401
+			if data['ip'] != str(request.environ['REMOTE_ADDR']):
+				ret = make_response(redirect("/login"))
+				ret.set_cookie("token", str(uuid.uuid4()))
+				return ret
 			current_user = Users.query.filter_by(public_id=data['public_id']).first()
 		except Exception as e:
 			return jsonify({'message': 'token is invalid', 'error': str(e)})
@@ -223,7 +241,7 @@ def createpost(user):
 	test = request.get_json()
 	delable = True
 	if user.postallow == False:
-		return jsonify({'error':"banned"})
+		return jsonify({'error': "banned"})
 	try:
 		content = test['content']
 		content, delable = checkinject(content, user)
@@ -249,14 +267,13 @@ def createpost(user):
 	return jsonify({"error": False, "id": new_post.pub_id})
 
 
-
 @app.route('/api/createreply', methods=['POST'])
 @token_required
 def createreply(user):
 	test = request.get_json()
 	delable = True
 	if user.postallow == False:
-		return jsonify({'error':"banned"})
+		return jsonify({'error': "banned"})
 	try:
 		temp = test['id']
 		parent = Posts.query.filter_by(pub_id=temp).first()
@@ -277,7 +294,6 @@ def createreply(user):
 		db.session.commit()
 	except Exception as e:
 		return jsonify({'error': str(e)})
-	print(user.posts)
 	return jsonify({"error": False, "id": new_post.pub_id})
 
 
@@ -322,13 +338,16 @@ def getpost(post_id):
 
 def getposts(user):
 	posts = Posts.query.all()
+	tor = []
 	if user != {}:
+		blist = str(user.blocked).split(",")
+		while '' in blist:
+			blist.remove('')
 		for post in posts:
-			print(post.content)
-			if post.creator in user.blocked or ","+post.creator in user.blocked or ","+post.creator+"," in user.blocked:
-				posts.remove(post)
+			if post.creator not in blist:
+				tor.append(post)
+		return tor
 	return posts
-
 
 @app.route('/')
 def mainpage():
@@ -351,7 +370,7 @@ def mainpage():
 					cont = cont.replace('u/' + us, f'<a href="/u/{us}">u/{us}</a>')
 					pst['content'] = cont
 					used.append(us)
-					
+
 		posts.append(pst)
 		create = Users.query.filter_by(public_id=post.creator).first()
 		creates.append(create)
@@ -429,28 +448,34 @@ def likepost(user):
 def login():
 	return render_template('login.html')
 
+
 @app.route('/api/login', methods=['POST'])
 def loginapi():
-	auth = request.form
-	user = Users.query.filter_by(name=auth['name']).first()
-	if not user:
-		return jsonify({"error": "User does not exist"})
-	if check_password_hash(user.password, auth['password']):
-		token = jwt.encode(
-			{
-			'public_id': user.public_id,
-			'exp': datetime.utcnow() + timedelta(minutes=240),
-			'ip': str(request.environ['REMOTE_ADDR'])
-			}, app.config['SECRET_KEY'], 'HS256')
-		ret = make_response(
-			jsonify({
-			"error": False,
-			"token": token,
-			"redirect": "/"
-			}))
-		ret.set_cookie('token', token)
-		return ret
-	return jsonify({"error": "Incorrect Username or Password"})
+	try:
+		auth = request.form
+		user = Users.query.filter_by(name=auth['name']).first()
+		if not user:
+			return jsonify({"error": "User does not exist"})
+		if check_password_hash(user.password, auth['password']):
+			token = jwt.encode(
+			 {
+			  'public_id': user.public_id,
+			  'exp': datetime.utcnow() + timedelta(days=28),
+			  'ip': str(request.environ['REMOTE_ADDR'])
+			 }, app.config['SECRET_KEY'], 'HS256')
+			ret = make_response(
+			 jsonify({
+			  "error": False,
+			  "token": token,
+			  "redirect": "/"
+			 }))
+			ret.set_cookie('token', token)
+			user.ip = str(request.environ['REMOTE_ADDR'])
+			db.session.commit()
+			return ret
+		return jsonify({"error": "Incorrect Username or Password"})
+	except Exception as e:
+		return jsonify({"error": str(e)}), 400
 
 
 @app.route('/admins')
@@ -500,12 +525,14 @@ def setuser(user):
 	except Exception as e:
 		return jsonify({"error": str(e)})
 
+
 def getuserfromid(id):
 	user = Users.query.filter_by(public_id=id).first()
 	if user:
 		return user
 	else:
 		return {}
+
 
 @app.route("/api/follow", methods=["POST"])
 @token_required
@@ -514,19 +541,19 @@ def followuser(user):
 	tof = test['id']
 	tof = getuserfromid(tof)
 	if tof.public_id in user.blocked:
-		return jsonify({"error":"User Blocked"})
+		return jsonify({"error": "User Blocked"})
 	if tof.public_id not in user.following:
-		tof.followers += ","+user.public_id
+		tof.followers += "," + user.public_id
 		tof.followercount += 1
-		user.following += ","+tof.public_id
+		user.following += "," + tof.public_id
 		user.followingcount += 1
 	else:
-		tof.followers = tof.followers.replace(","+user.public_id,"")
+		tof.followers = tof.followers.replace("," + user.public_id, "")
 		tof.followercount -= 1
-		user.following = user.following.replace(","+tof.public_id,"")
+		user.following = user.following.replace("," + tof.public_id, "")
 		user.followingcount -= 1
 	db.session.commit()
-	return jsonify({"error":False})
+	return jsonify({"error": False})
 
 
 @app.route("/api/block", methods=["POST"])
@@ -536,13 +563,14 @@ def blockuser(user):
 	tof = test['id']
 	tof = getuserfromid(tof)
 	if tof.public_id in user.following:
-		return jsonify({"error":"Following User"})
+		return jsonify({"error": "Following User"})
 	if tof.public_id not in user.blocked:
-		user.blocked += ","+tof.public_id
+		user.blocked += "," + tof.public_id
 	else:
-		user.blocked = user.blocked.replace(","+tof.public_id,"")
+		user.blocked = user.blocked.replace("," + tof.public_id, "")
 	db.session.commit()
-	return jsonify({"error":False})
+	return jsonify({"error": False})
+
 
 @app.route('/api/deleteuser', methods=['POST'])
 @token_required
@@ -556,7 +584,7 @@ def deleteuser(user):
 		user = Users.query.filter_by(public_id=test['id']).first()
 		user.password = "jhalksdjghhzbxkvjchgiuoahekjlsadhdfuiohasdfmnkjasdfd"
 		user.bio = "This user has been deleted!"
-		user.name = "Deleted User "+str(randint(0,99999999))
+		user.name = "Deleted User " + str(randint(0, 99999999))
 		user.pfpurl = "/assets/newuser.png"
 		user.admin = False
 		user.postallow = False
@@ -631,7 +659,7 @@ def showuser(user):
 @token_required
 def setsettings(user):
 	try:
-		test = request.json
+		test = request.form
 		print(test)
 		userlist = Users.query.filter_by(name=test['name']).first()
 		if userlist and user.name != test['name']:
@@ -674,6 +702,7 @@ def getpostcontent(user):
 		return jsonify({"error": True, "post": "post not found"})
 	return jsonify({"error": False, "post": post.content})
 
+
 @app.route('/api/editpost', methods=['POST'])
 @token_required
 def editpost(user):
@@ -685,7 +714,6 @@ def editpost(user):
 		post = Posts.query.filter_by(pub_id=id).first()
 		if not post:
 			return jsonify({"error": "post not found"}), 404
-		print(post.creator, user.public_id, user.admin)
 		if post.creator != user.public_id and user.admin == False:
 			post.content = post.content + f"<br> {user.name} felt it was necessary to try and edit this post."
 			post.edited = post.edited

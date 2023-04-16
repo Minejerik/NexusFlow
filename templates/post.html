@@ -1,0 +1,74 @@
+<div class="container posts-content">
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card mb-4">
+              <div class="card-body">
+                <div class="media mb-3">
+                  <div class="d-flex align-items-center">
+                    <img src="{{create['pfpurl']}}" class="rounded-circle" alt="" width="40px" height="40px"> &nbsp;&nbsp;
+                    <div class="media-body ml-3">
+                      <a href="/u/{{create['name']}}">{{create['name']}}{% if create.admin == True %} </a> <span class="badge bg-success rounded-pill">Admin</span> {% else%} </a> {% endif %}
+                    </div>&nbsp;&nbsp;&nbsp;&nbsp;
+                    <div class="text-muted small">{{post['date_created']}} &nbsp;&nbsp; 
+<div class="btn-group">
+  <button type="button" class="btn btn-link dropdown-toggle btn-sm" data-bs-toggle="dropdown" aria-expanded="false">
+    Info
+  </button>
+  <ul class="dropdown-menu">
+    {% if create['public_id'] == myuser['public_id'] and  post['del_allow'] == True or myuser['admin'] ==True %}
+    <li><a class="dropdown-item" href="javascript:edit('{{post['pub_id']}}')">Edit Post</a></li>
+    <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#delete{{post['pubid']}}">Delete Post</button></li>
+    <li><hr class="dropdown-divider"></li>
+    {% endif %}
+    <li><a class="dropdown-item" href="javascript:getpostlink('{{post.pub_id}}')">Copy Link</a></li>
+  </ul>
+</div>
+</div>
+                  </div>
+                </div>
+                <div id="content{{post['pub_id']}}">
+                <p id="content-text{{post['pub_id']}}">
+									{{post['content']|markdown}}
+                </p>
+                </div>
+              </div>
+              <div class="card-footer">
+                <a href="javascript:send('{{post['pub_id']}}')" class="d-inline-block text-muted">
+                    
+                  {% if post['pub_id'] in likes %}
+                  <strong>{{post['likes']}}</strong> Liked
+              {% else %}
+                  <strong>{{post['likes']}}</strong> Likes
+              {% endif %}
+                </a>
+                <a href="/p/{{post['pub_id']}}" class="d-inline-block text-muted ml-3">
+                    <strong>{{post['comments']}}</strong> Comments
+                </a>
+                &nbsp;&nbsp;
+                {% if post['edited'] == True %}
+                    <strong>Edited</strong>
+                {% endif %}
+              </div>
+            </div>
+        </div>
+</div>
+</div>
+
+
+<div class="modal fade" id="delete{{post['pubid']}}" tabindex="-1" aria-labelledby="deleteLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="deleteLabel">Delete Post</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to delete this post?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-danger" onclick="del('{{post['pub_id']}}')">Delete Post</button>
+      </div>
+    </div>
+  </div>
+</div>

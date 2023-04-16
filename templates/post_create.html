@@ -41,20 +41,19 @@
                 method: "POST"
             })
             const resptxt = await resp2.text()
-			const tempa = JSON.parse(resptxt)
+						const tempa = JSON.parse(resptxt)
+						window.location.href = "/"
         }
     </script>
     {% set user = myuser %}
 {% include "header.html" %}
 <div class="container py-5">
     <h1 class="mb-4">Create a Post</h1>
-    <form onsubmit="javascript:post()">
       <div class="mb-3">
         <textarea class="form-control" id="body" rows="5"></textarea>
         <small class="form-text text-muted">The only permitted HTML tags are  &lt;br&gt; and &lt;img&gt;.</small>
       </div>
-      <button type="submit" class="btn btn-primary">Submit</button>
-    </form>
+      <button type="button" onclick="post()" class="btn btn-primary">Submit</button>
   </div>
 	{% include "footer.html" %}
 </body>

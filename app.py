@@ -48,7 +48,7 @@ def human_format(num):
 
 
 def contains_sql_statement(input_string):
-	sql_pattern = re.compile(r'\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|DROP)\b',
+	sql_pattern = re.compile(r'\b(SELECT|INSERT INTO|DELETE FROM|DROP)\b',
 	                         re.IGNORECASE)
 	match = sql_pattern.search(input_string)
 	return match is not None
@@ -74,9 +74,6 @@ def checkinject(input_string, user):
 domain = "https://nexusflow.minejerik.repl.co/"
 
 
-@app.context_processor
-def inject_now():
-	return {'now': datetime.utcnow(), 'domain': domain}
 
 
 @app.template_filter('format')
@@ -134,6 +131,16 @@ class links(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 	link = db.Column(db.String(30))
 	linkto = db.Column(db.String())
+
+def getpostcount():
+	return len(Posts.query.all())
+
+def getusercount():
+	return len(Users.query.all())
+
+@app.context_processor
+def inject_now():
+	return {'now': datetime.utcnow(), 'domain': domain, 'postcount':getpostcount(), 'usercount':getusercount()}
 
 
 with app.app_context():
@@ -267,6 +274,9 @@ def createpost(user):
 	return jsonify({"error": False, "id": new_post.pub_id})
 
 
+
+
+
 @app.route('/api/createreply', methods=['POST'])
 @token_required
 def createreply(user):
@@ -337,7 +347,7 @@ def getpost(post_id):
 
 
 def getposts(user):
-	posts = Posts.query.all()
+	posts = Posts.query.order_by(Posts.id.desc()).all()
 	tor = []
 	if user != {}:
 		blist = str(user.blocked).split(",")
@@ -345,6 +355,8 @@ def getposts(user):
 			blist.remove('')
 		for post in posts:
 			if post.creator not in blist:
+				# date_format = time.mktime(post.date_created.timetuple())
+				# print(date_format)
 				tor.append(post)
 		return tor
 	return posts
@@ -361,6 +373,7 @@ def mainpage():
 	for post in temp:
 		matches = re.findall(r'u\/(\S+)', post.content)
 		pst = post.__dict__
+		pst['content'] = pst['content'].replace("\n","<br>")
 		if matches != None:
 			for us in matches:
 				cont = post.content
@@ -407,7 +420,8 @@ def deletepost(user):
 			return jsonify({"error": False}), 400
 		if user.admin == False and user.public_id != post.creator:
 			return jsonify({"error": True}), 401
-		db.session.delete(post)
+		post.content = "[DELETED]"
+		post.del_allow = False
 		if len(str(creator.posts).split(',')) > 1:
 			creator.posts = str(creator.posts).replace(',' + str(test['id']), "")
 		else:

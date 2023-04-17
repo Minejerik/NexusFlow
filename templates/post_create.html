@@ -42,7 +42,13 @@
             })
             const resptxt = await resp2.text()
 						const tempa = JSON.parse(resptxt)
-						window.location.href = "/"
+						if (tempa.error == false){
+							window.location.href = "/"
+						} else if (tempa.error == "banned"){
+							alert("You have been banned from posting!")
+						} else {
+							alert(tempa.error)
+						}
         }
     </script>
     {% set user = myuser %}
@@ -51,7 +57,7 @@
     <h1 class="mb-4">Create a Post</h1>
       <div class="mb-3">
         <textarea class="form-control" id="body" rows="5"></textarea>
-        <small class="form-text text-muted">The only permitted HTML tags are  &lt;br&gt; and &lt;img&gt;.</small>
+        <small class="form-text text-muted">Please use markdown instead of HTML.</small>
       </div>
       <button type="button" onclick="post()" class="btn btn-primary">Submit</button>
   </div>

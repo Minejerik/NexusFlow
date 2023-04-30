@@ -13,6 +13,7 @@ Flask = "^2.2.3"
 Flask-SQLAlchemy = "^3.0.3"
 Flask-Htmldoom = "^0.2.1"
 Flask-Admin = "^1.6.1"
+textblob = "^0.17.1"
 
 [tool.poetry.dev-dependencies]
 

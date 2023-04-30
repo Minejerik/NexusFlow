@@ -1,18 +1,25 @@
 from flask import Flask, jsonify, make_response, request, redirect, render_template, send_file
 from random import randint
 import re
+from textblob import TextBlob
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 from flask_admin.contrib.sqla import ModelView
+from werkzeug.utils import secure_filename
+import time
 from flask_admin import Admin
+import os
 import uuid
 from flaskext.markdown import Markdown
 from sqlalchemy.inspection import inspect
 import jwt
 from datetime import datetime, timedelta
 
-UPLOAD_FOLDER = '/static/uploads'
+MAXDMCOUNT = 5
+MAXBIOLENGTH = 150
+MAXPOSTLENGTH = 500
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app = Flask(__name__)
@@ -20,7 +27,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = '6012b733dee6fdc6dee94bfa23c2af1c'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///faceclone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = 'static/assets'
 app.config['FLASK_ADMIN_SWATCH'] = 'slate'
 app.jinja_env.trim_blocks = True
 app.jinja_env.lstrip_blocks = True
@@ -116,15 +123,23 @@ class Posts(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 	pub_id = db.Column(db.String(75))
 	date_created = db.Column(db.DateTime, default=datetime.utcnow)
-	content = db.Column(db.String(2000))
+	content = db.Column(db.String(750))
 	parentpost = db.Column(db.String())
 	creator = db.Column(db.String(50))
 	subpost = db.Column(db.String())
 	likes = db.Column(db.Integer)
 	comments = db.Column(db.Integer)
+	sent = db.Column(db.Float)
 	del_allow = db.Column(db.Boolean)
 	isreply = db.Column(db.Boolean)
 	edited = db.Column(db.Boolean)
+
+class dm(db.Model):
+	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+	pubid = db.Column(db.String(75))
+	count = db.Column(db.Integer)
+	members = db.Column(db.String())
+	messages = db.Column(db.String())
 
 
 class links(db.Model):
@@ -146,7 +161,7 @@ def inject_now():
 with app.app_context():
 	db.create_all()
 
-admin = Admin(app, name='NexusFlow', template_mode='bootstrap3')
+admin = Admin(app, name='NexusFlow', template_mode='bootstrap4')
 admin.add_view(ModelView(Users, db.session))
 admin.add_view(ModelView(Posts, db.session))
 admin.add_view(ModelView(links, db.session))
@@ -157,7 +172,7 @@ def send_assets(path):
 	try:
 		return send_file("static/assets/" + path)
 	except:
-		return "Not Found", 404
+		return send_file('static/assets/unk.png')
 
 
 @app.route('/l/<path:path>')
@@ -230,6 +245,11 @@ def token_required(f):
 
 	return decorator
 
+# @app.route('/test')
+# @token_required
+# def handletest(user):
+# 	chats=Users.query.all()
+# 	return render_template('messages.html', myuser=user, chats=chats)
 
 def getuserfromtoken(token):
 	if not token:
@@ -251,11 +271,18 @@ def createpost(user):
 		return jsonify({'error': "banned"})
 	try:
 		content = test['content']
+		if len(content) > MAXPOSTLENGTH:
+			return jsonify({"error":"to long"})
 		content, delable = checkinject(content, user)
+		cont = TextBlob(content)
+		sent = cont.sentiment.polarity
+		if sent == 0:
+			sent = cont.sentiment.subjectivity
 		new_post = Posts(pub_id=str(uuid.uuid4()),
-		                 content=content,
+		                 content=str(cont),
 		                 creator=user.public_id,
 		                 parentpost=test['parentpost'],
+										 sent = sent,
 		                 isreply=False,
 		                 subpost=test['subpost'],
 		                 likes=0,
@@ -290,11 +317,16 @@ def createreply(user):
 		parent.comments += 1
 		content = test['content']
 		content, delable = checkinject(content, user)
+		cont = TextBlob(content)
+		sent = cont.sentiment.polarity
+		if sent == 0:
+			sent = cont.sentiment.subjectivity
 		new_post = Posts(pub_id=str(uuid.uuid4()),
 		                 content=content,
 		                 creator=user.public_id,
 		                 parentpost=test['id'],
 		                 subpost="",
+										 sent = sent,
 		                 likes=0,
 		                 isreply=True,
 		                 comments=0,
@@ -673,14 +705,28 @@ def showuser(user):
 @token_required
 def setsettings(user):
 	try:
-		test = request.form
-		print(test)
+		test = request.form.to_dict()
 		userlist = Users.query.filter_by(name=test['name']).first()
 		if userlist and user.name != test['name']:
 			return jsonify({"error": "Username already taken"})
+		try:
+			if not os.path.exists(app.config['UPLOAD_FOLDER']):
+				os.makedirs(app.config['UPLOAD_FOLDER'])
+			f = request.files['pfp']
+			print(f.filename)
+			allow = False
+			for file in ALLOWED_EXTENSIONS:
+				if f.filename.endswith(file):
+					allow = True
+			if allow == True:
+				filename = f'{time.time()}_{user.name}_{secure_filename(f.filename)}'
+				f.save(os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename)))
+				user.pfpurl = "/assets/"+secure_filename(filename)
+		except Exception as e:
+			print(e)
 		user.name = test['name']
 		temp, allow = checkinject(test['bio'], user)
-		if allow == True:
+		if allow == True and len(test['bio']) <= MAXBIOLENGTH:
 			user.bio = test['bio']
 		if test['password'] != None and test['password'] != '':
 			temp = generate_password_hash(test['password'], method='sha256')

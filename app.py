@@ -61,8 +61,8 @@ def contains_sql_statement(input_string):
 	return match is not None
 
 
-filters = ["<script>", "</script>", "<br>", "<", ">"]
-allowed = ["<br>", "<", ">", "<img>"]
+filters = ["<script>", "</script>", "<br>", "<", ">","<style>","</style>","<marquee>","</marquee>"]
+allowed = ["<", ">"]
 
 
 def checkinject(input_string, user):
@@ -146,6 +146,7 @@ class links(db.Model):
 	id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 	link = db.Column(db.String(30))
 	linkto = db.Column(db.String())
+	clicks = db.Column(db.Integer, default = 0)
 
 def getpostcount():
 	return len(Posts.query.all())
@@ -179,6 +180,8 @@ def send_assets(path):
 def getlink(path):
 	try:
 		gotlink = links.query.filter_by(link=path).first()
+		gotlink.clicks += 1
+		db.session.commit()
 		return redirect(gotlink.linkto)
 	except:
 		return "Not Found", 404
@@ -769,6 +772,7 @@ def editpost(user):
 	if not request.form:
 		return jsonify({"error": "malformed request"}), 400
 	id = request.form['id']
+	print(request.form)
 	try:
 		content, delable = checkinject(request.form['content'], user)
 		post = Posts.query.filter_by(pub_id=id).first()
